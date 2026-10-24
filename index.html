@@ -190,9 +190,9 @@ button.cell:active,.tap:active{background:var(--f4)}
 /* Read-only values in the secondary colour. opacity:1 undoes iOS's own
    faded disabled field, which in dark is dimmer than its unit. */
 .cin:disabled{color:var(--lab2);-webkit-text-fill-color:var(--lab2);opacity:1}
-/* Wide enough for "years", so the values in a card end on one edge. No
-   tracking of its own: it inherits the value's. */
-.unit{color:var(--lab2);font-size:17px;flex:none;text-align:left;min-width:2.6em}
+/* Wide enough for "kcal", the widest unit, so the values in a card end on one
+   edge. No tracking of its own: it inherits the value's. */
+.unit{color:var(--lab2);font-size:17px;flex:none;text-align:left;min-width:2.2em}
 
 /* ==========================================================================
    Date navigator
@@ -555,6 +555,10 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
   letter-spacing:-.024em;transition:color .18s,opacity .18s;opacity:.6}
 .wheel i.on{color:var(--lab);opacity:1;font-weight:500}
 .wheel i.off{opacity:.3}
+/* Birthday: three wheels open inline under their row, as Health asks for a
+   date of birth. The value turns tint while its wheels are open. */
+.bday{display:grid;align-items:center;column-gap:4px;padding:2px 0}
+.cell[aria-expanded="true"] .cv{color:var(--tint)}
 
 @media (prefers-reduced-motion:reduce){.sheet,.ov-back,.alert,.menu,.hud,.seg .thumb,.sw-in,.bar span,.ring .val,.tgl,.tgl span,.prayer i,.ck,.cal-title svg{transition:none!important}.navbar .nt{transform:none;transition:opacity .2s ease}.prayer.pop i,.cal-grid.slide-l,.cal-grid.slide-r{animation:none}}
 </style>
@@ -788,11 +792,24 @@ function weightOn(k){
   }
   return kg;
 }
+/* Age in whole years on a day. A profile holds its birthday as bd; ones saved
+   before birthdays existed hold only the year (by), read as before. Every
+   profile written now carries both, so an older copy of the app still works. */
+const validBd=s=>typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s);
+function ageOf(p,on){
+  const t=on?fromKey(on):new Date();
+  if(validBd(p.bd)){
+    const b=fromKey(p.bd);let a=t.getFullYear()-b.getFullYear();
+    if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))a--;
+    return a;
+  }
+  return p.by>0?t.getFullYear()-p.by:null;
+}
 function plan(k,draft,{noCustom}={}){
   const p=draft?draft.profile:S.meta.profile;if(!p)return null;
   const g=draft?draft.goal:S.meta.goal, c=draft||noCustom?{}:S.meta.custom||{};
   const kg=(draft?p.kg:weightOn(k))||p.kg;
-  const age=new Date().getFullYear()-p.by;
+  const age=ageOf(p);
   const bmr=10*kg+6.25*p.cm-5*age+(p.sex==="f"?-161:5);
   const tdee=bmr*p.act;
   const r=((RATE[g.type]||RATE.maintain)[g.pace])||0;
@@ -2558,16 +2575,55 @@ $("logWeight").addEventListener("click",()=>openWeight(todayKey(),{focus:true}))
 /* ==========================================================================
    Profile form — first run and the Me tab
    ========================================================================== */
+/* Day, month and year in the order this phone writes a date. */
+function dateOrder(){
+  try{
+    const o=new Intl.DateTimeFormat(undefined,{day:"numeric",month:"long",year:"numeric"})
+      .formatToParts(new Date(2000,0,2)).map(x=>x.type).filter(t=>t==="day"||t==="month"||t==="year");
+    if(o.length===3)return o;
+  }catch(e){}
+  return["day","month","year"];
+}
+const AGE_MIN=13,AGE_MAX=100;
+/* Three wheels for a birthday, ages 13 to 100. A day past the end of the
+   month (31 February) slides back to the last real day, as UIDatePicker does. */
+function birthdayWheels(value,onChange){
+  const yNow=new Date().getFullYear(),yMin=yNow-AGE_MAX,yMax=yNow-AGE_MIN;
+  let[y,m,d]=value.split("-").map(Number);y=clampNum(y,yMin,yMax);
+  const years=[];for(let i=yMin;i<=yMax;i++)years.push(String(i));
+  const cols={};
+  /* Placing the wheels scrolls them too, which would read as a choice. Only
+     a touch, a click, a scroll wheel or a key counts. */
+  let armed=false;const arm=()=>{armed=true};
+  const commit=()=>{
+    if(!armed)return;
+    const last=new Date(y,m,0).getDate();
+    if(d>last){d=last;cols.day.setTo(d-1)}
+    onChange(`${y}-${pad(m)}-${pad(d)}`);
+  };
+  cols.day=wheel(Array.from({length:31},(_,i)=>String(i+1)),d-1,i=>{d=i+1;commit()});
+  cols.month=wheel(MONTHS,m-1,i=>{m=i+1;commit()});
+  cols.year=wheel(years,y-yMin,i=>{y=yMin+i;commit()});
+  const box=el("div","bday wheels");
+  ["pointerdown","touchstart","wheel","keydown"].forEach(t=>box.addEventListener(t,arm,{passive:true}));
+  const order=dateOrder();
+  box.style.gridTemplateColumns=order.map(t=>t==="month"?"1.7fr":t==="year"?"1fr":".7fr").join(" ");
+  order.forEach(t=>{cols[t].setAttribute("aria-label",t[0].toUpperCase()+t.slice(1));box.appendChild(cols[t])});
+  box.init=()=>order.forEach(t=>cols[t].init());
+  return box;
+}
+
 const GOALS=[["lose","Lose fat"],["maintain","Maintain"],["gain","Build muscle"]];
 const goalText=g=>g.type==="maintain"?"Maintain":`${g.type==="lose"?"Lose fat":"Build muscle"} · ${g.pace==="fast"?"faster":"steady"}`;
 function profileForm(init){
   const p=init.profile||{},g=init.goal||{type:"maintain",pace:"slow"};
-  const d={sex:p.sex||null,age:p.by?new Date().getFullYear()-p.by:null,cm:p.cm||null,kg:init.kg||p.kg||null,act:p.act||1.375,type:g.type,pace:g.pace||"slow"};
+  const d={sex:p.sex||null,bd:validBd(p.bd)?p.bd:null,by:p.by>0?p.by:null,cm:p.cm||null,kg:init.kg||p.kg||null,act:p.act||1.375,type:g.type,pace:g.pace||"slow"};
   const node=el("div");
   node.innerHTML=`<div class="shdr"><h2 class="t">About you</h2></div>
     <div class="card">
       <div class="cell"><span class="cl" style="flex:none">Sex</span><div style="flex:1" data-sex></div></div>
-      ${fieldRow("Age",{value:d.age||"",unit:"years",mode:"numeric",placeholder:"Required"})}
+      <button class="cell" type="button" data-bd aria-expanded="false"><span class="cl" style="flex:none">Birthday</span><span class="cv" style="flex:1"></span></button>
+      <div class="cell block hidden" data-bdw></div>
       ${fieldRow("Height",{value:d.cm||"",unit:"cm",placeholder:"Required"})}
       ${fieldRow("Weight",{value:d.kg||"",unit:"kg",placeholder:"Required"})}
       <button class="cell" type="button" data-act><span class="cl" style="flex:none">Activity</span><span class="cv" style="flex:1"></span><span class="tintc">${UPDOWN}</span></button>
@@ -2584,18 +2640,45 @@ function profileForm(init){
   node.querySelector("[data-goal]").appendChild(makeSeg(GOALS,d.type,v=>{d.type=v;upd()},"Goal"));
   node.querySelector("[data-pace]").appendChild(paceSeg);
   const ins=node.querySelectorAll("input");
-  ins.forEach(i=>i.addEventListener("input",()=>{d.age=num(ins[0].value);d.cm=num(ins[1].value);d.kg=num(ins[2].value);upd()}));
+  ins.forEach(i=>i.addEventListener("input",()=>{d.cm=num(ins[0].value);d.kg=num(ins[1].value);upd()}));
   selectOnFocus(node);
   node.querySelector("[data-act]").onclick=e=>menu(e.currentTarget,ACT.map(([v,label,desc])=>({label,detail:desc,selected:v===d.act,onSelect:()=>{d.act=v;upd()}})));
-  function valid(){return !!(d.sex&&d.age>=13&&d.age<=100&&d.cm>=120&&d.cm<=230&&d.kg>=30&&d.kg<=300)}
+
+  /* Birthday row. Opening the wheels sets nothing; turning one does, so a
+     glance never saves a made-up date. A profile that only knows the year
+     shows the year until a day is chosen. */
+  const bRow=node.querySelector("[data-bd]"),bBox=node.querySelector("[data-bdw]"),bVal=bRow.querySelector(".cv");
+  let bWheels=null;
+  const bdText=()=>d.bd?fmt(d.bd,{day:"numeric",month:"long",year:"numeric"}):d.by?String(d.by):"";
+  const showBd=()=>{const t=bdText();bVal.textContent=t||"Required";bVal.style.color=t?"":"var(--lab3)"};
+  const setOpen=open=>{
+    bBox.classList.toggle("hidden",!open);bRow.setAttribute("aria-expanded",String(open));
+    if(open&&!bWheels){
+      const start=d.bd||(d.by?`${d.by}-07-01`:`${new Date().getFullYear()-30}-01-01`);
+      bWheels=birthdayWheels(start,v=>{d.bd=v;d.by=+v.slice(0,4);showBd();upd()});
+      bBox.appendChild(bWheels);
+    }
+    if(open)bWheels.init();   /* scroll positions need the wheels on screen */
+  };
+  bRow.onclick=()=>{haptic();setOpen(bBox.classList.contains("hidden"))};
+  ins.forEach(i=>i.addEventListener("focus",()=>setOpen(false)));
+  showBd();
+
+  const age=()=>ageOf({bd:d.bd,by:d.by});
+  function valid(){const a=age();return !!(d.sex&&a>=AGE_MIN&&a<=AGE_MAX&&d.cm>=120&&d.cm<=230&&d.kg>=30&&d.kg<=300)}
   /* The action stays disabled until valid, so the note has to say why. */
   function problem(){
-    if(d.age!=null&&!(d.age>=13&&d.age<=100))return "Age must be between 13 and 100.";
+    const a=age();
+    if(a!=null&&!(a>=AGE_MIN&&a<=AGE_MAX))return `You need to be between ${AGE_MIN} and ${AGE_MAX}.`;
     if(d.cm!=null&&!(d.cm>=120&&d.cm<=230))return "Height must be between 120 and 230 cm.";
     if(d.kg!=null&&!(d.kg>=30&&d.kg<=300))return "Weight must be between 30 and 300 kg.";
     return null;
   }
-  function value(){return{profile:{sex:d.sex,by:new Date().getFullYear()-Math.round(d.age),cm:d.cm,kg:d.kg,act:d.act},goal:{type:d.type,pace:d.pace}}}
+  function value(){
+    const profile={sex:d.sex,by:d.bd?+d.bd.slice(0,4):d.by,cm:d.cm,kg:d.kg,act:d.act};
+    if(d.bd)profile.bd=d.bd;
+    return{profile,goal:{type:d.type,pace:d.pace}};
+  }
   function upd(){
     const a=ACT.find(x=>x[0]===d.act)||ACT[1];
     node.querySelector("[data-act] .cv").textContent=a[1];
@@ -2603,7 +2686,7 @@ function profileForm(init){
     node.querySelector("[data-pace]").classList.toggle("hidden",d.type==="maintain");
     const res=node.querySelector("[data-result]"),note=node.querySelector("[data-note]"),pd=node.querySelector("[data-pacedesc]");
     if(!valid()){
-      res.innerHTML="";note.textContent=problem()||"Fill in your sex, age, height and weight to see your numbers.";
+      res.innerHTML="";note.textContent=problem()||"Fill in your sex, birthday, height and weight to see your numbers.";
       pd.textContent="";if(node.onValid)node.onValid(false);return;
     }
     const v=value();const pl=plan(null,v);
