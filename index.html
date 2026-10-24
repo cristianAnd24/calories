@@ -26,6 +26,9 @@
   --sep:rgba(60,60,67,.29);
   --tint:#007aff; --tint-weak:rgba(0,122,255,.12); --on-tint:#ffffff;
   --red:#ff3b30; --green:#34c759; --orange:#ff9500; --yellow:#ffcc00;
+  /* Apple's Increase Contrast red and green, for anything read as text. The
+     plain ones stay for fills, rings and bars. */
+  --red-text:#d70015; --green-text:#248a3d; --alert:rgba(249,249,249,.9); --tab-off:#8e8e93;
   --pink:#ff2d55; --teal:#30b0c7; --indigo:#5856d6; --purple:#af52de;
   --gold-weak:rgba(255,149,0,.12);
   /* macros: protein, carbs, fat */
@@ -47,6 +50,7 @@
   --sep:rgba(84,84,88,.65);
   --tint:#0a84ff; --tint-weak:rgba(10,132,255,.22); --on-tint:#ffffff;
   --red:#ff453a; --green:#30d158; --orange:#ff9f0a; --yellow:#ffd60a;
+  --red-text:#ff453a; --green-text:#30d158; --alert:rgba(44,44,46,.74);
   --pink:#ff375f; --teal:#40cbe0; --indigo:#5e5ce6; --purple:#bf5af2;
   --gold-weak:rgba(255,159,10,.18);
   --pro:#ff375f; --carb:#40cbe0; --fat:#ff9f0a;
@@ -62,12 +66,15 @@
   --sep:rgba(84,84,88,.65);
   --tint:#0a84ff; --tint-weak:rgba(10,132,255,.22); --on-tint:#ffffff;
   --red:#ff453a; --green:#30d158; --orange:#ff9f0a; --yellow:#ffd60a;
+  --red-text:#ff453a; --green-text:#30d158; --alert:rgba(44,44,46,.74);
   --pink:#ff375f; --teal:#40cbe0; --indigo:#5e5ce6; --purple:#bf5af2;
   --gold-weak:rgba(255,159,10,.18);
   --pro:#ff375f; --carb:#40cbe0; --fat:#ff9f0a;
   --thumb:#636366; --thumb-sh:0 3px 8px rgba(0,0,0,.3);
   --pop:0 10px 34px rgba(0,0,0,.5); --lift:0 -14px 50px rgba(0,0,0,.6);
   color-scheme:dark;}
+/* Increase Contrast. Plain :root, so the dark blocks above still win there. */
+@media (prefers-contrast:more){:root{--lab2:rgba(60,60,67,.76);--tint:#0040dd;--tint-weak:rgba(0,64,221,.12)}}
 
 /* ==========================================================================
    Base
@@ -85,20 +92,27 @@ body.locked{overflow:hidden}
 button,input,select,textarea{font:inherit;color:inherit;letter-spacing:inherit}
 /* Two quick taps on a control would otherwise zoom the page on iOS. The finger
    lands on the icon inside a button, so the descendants need it too, and the
-   containers are covered as a backstop. Narrower values (pan-y on swipe rows,
-   none on sheet handles) still win. See ../CLAUDE.md, "Fix once". */
+   containers are covered as a backstop. WebKit resets the used value at every
+   overflow:auto or overflow:scroll element, so each scroller is named too.
+   Narrower values (pan-y on swipe rows, none on sheet handles) still win.
+   See ../CLAUDE.md, "Fix once". */
 button,input,select,textarea,a,label,[role="button"],
 button *,label *,a *,
-main,#ui,#gate{touch-action:manipulation}
+main,#ui,#gate,.sheet-body,.menu,.wheel,.wheel *{touch-action:manipulation}
 button{cursor:pointer;-webkit-appearance:none;appearance:none;border:0;background:none;padding:0}
 input{-webkit-appearance:none;appearance:none;border-radius:0}
 :focus{outline:none}
 :focus-visible{outline:2.5px solid var(--tint);outline-offset:2px}
-.alert :focus-visible,.menu :focus-visible{outline-offset:-3px}
+/* A focused text field shows only the caret, as UITextField does. */
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:none}
+/* Rows flush inside a clipping container draw the ring inward. */
+.alert :focus-visible,.menu :focus-visible,.card .cell:focus-visible,.card .fr:focus-visible,.card .surah:focus-visible,.pm button:focus-visible{outline-offset:-3px}
 .alert:focus,.alert:focus-visible{outline:none}
+.sheet:focus,.menu:focus{outline:none}
 input[type=search]::-webkit-search-cancel-button,
 input[type=search]::-webkit-search-decoration{-webkit-appearance:none;display:none}
 .hidden{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 svg{display:block;flex:none}
 .num{font-variant-numeric:tabular-nums}
 
@@ -135,24 +149,30 @@ main{max-width:560px;margin:0 auto;
 .shdr{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;
   margin:26px 20px 7px;font-size:13px;line-height:1.3;letter-spacing:-.006em;min-height:17px}
 .shdr .t{color:var(--lab2);text-transform:uppercase;letter-spacing:.045em}
-.shdr .x{color:var(--lab2);font-variant-numeric:tabular-nums}
-.shdr button.x{display:flex;align-items:center;gap:6px;color:var(--lab2);margin:-12px -12px -6px 0;padding:12px 12px 6px}
+.shdr h2{margin:0;font:inherit}
+.shdr .x{color:var(--lab2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.shdr button.x{display:flex;align-items:center;gap:6px;color:var(--lab2);margin:-16px -12px -6px 0;padding:16px 12px 6px}
 .shdr button.x .dots{color:var(--tint)}
 .shdr button.x:active{opacity:.4}
 .foot{font-size:13px;line-height:1.38;letter-spacing:-.006em;color:var(--lab2);margin:7px 20px 0}
 .note{font-size:13px;line-height:1.42;letter-spacing:-.006em;color:var(--lab);background:var(--gold-weak);
   border-radius:10px;padding:12px 14px;margin:12px 0 0}
 .note b{font-weight:600}
-.err{color:var(--red)}
+.err{color:var(--red-text)}
 .card{background:var(--card);border-radius:12px;overflow:hidden}
-.sheet .card{background:var(--raised)}
+.sheet .card,.sheet .tile{background:var(--raised)}
 .cell{display:flex;align-items:center;gap:12px;min-height:46px;padding:9px 16px;
   position:relative;width:100%;text-align:left}
 .cell+.cell::before,.cell+.sw::before,.sw+.cell::before{content:"";position:absolute;top:0;left:16px;right:0;
   border-top:.5px solid var(--sep);z-index:2}
 .cell.block{display:block}
+/* Under heavy page zoom a row stacks rather than crushing its field to 0. */
+@media (max-width:300px){.cell{flex-wrap:wrap}.shdr{flex-wrap:wrap}.shdr button.x{margin-left:auto}}
 .cl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cv{color:var(--lab2);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+/* As in an iOS value1 cell, the detail gives way before the label does. */
+#v-me .cl{flex:1 0 auto}
+#v-me .cv{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .keyline{display:block;width:100%;color:var(--lab2);word-break:break-all;
   font:500 13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;
   -webkit-user-select:all;user-select:all}
@@ -163,11 +183,16 @@ button.cell:active,.tap:active{background:var(--f4)}
 .tintc{color:var(--tint)}
 .addrow{color:var(--tint);gap:10px}
 .addrow svg{color:var(--tint)}
-.cin{flex:1;min-width:0;border:0;background:none;text-align:right;font-size:17px;
+.cin{flex:1;min-width:3em;border:0;background:none;text-align:right;font-size:17px;letter-spacing:-.026em;
   color:var(--lab);font-variant-numeric:tabular-nums;padding:0}
 .cin::placeholder{color:var(--lab3)}
 .cin.left{text-align:left}
-.unit{color:var(--lab2);font-size:17px;flex:none;min-width:20px}
+/* Read-only values in the secondary colour. opacity:1 undoes iOS's own
+   faded disabled field, which in dark is dimmer than its unit. */
+.cin:disabled{color:var(--lab2);-webkit-text-fill-color:var(--lab2);opacity:1}
+/* Wide enough for "years", so the values in a card end on one edge. No
+   tracking of its own: it inherits the value's. */
+.unit{color:var(--lab2);font-size:17px;flex:none;text-align:left;min-width:2.6em}
 
 /* ==========================================================================
    Date navigator
@@ -177,7 +202,7 @@ button.cell:active,.tap:active{background:var(--f4)}
   display:flex;align-items:center;justify-content:center;transition:background .15s,opacity .15s}
 .arrow:active:not(:disabled){background:var(--f4)}
 .arrow:disabled{color:var(--lab3)}
-.dlabel{flex:1;min-width:0;text-align:center;border-radius:10px;padding:8px 4px;
+.dlabel{flex:1;min-width:0;align-self:stretch;text-align:center;border-radius:10px;padding:8px 4px;
   display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
 .dlabel:active{background:var(--f4)}
 .dlabel span{font-size:17px;font-weight:600;letter-spacing:-.026em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -186,20 +211,20 @@ button.cell:active,.tap:active{background:var(--f4)}
 /* ==========================================================================
    Day summary: ring + macros
    ========================================================================== */
-.sum{display:flex;align-items:center;gap:18px;padding:16px 16px 6px}
+.sum{display:flex;flex-wrap:wrap;align-items:center;gap:18px;padding:16px 16px 6px}
 .ring{position:relative;width:104px;height:104px;flex:none}
 .ring svg{width:104px;height:104px;transform:rotate(-90deg)}
 .ring .trk{stroke:var(--f3)}
 .ring .val{stroke:var(--green);transition:stroke-dashoffset .6s var(--ease),stroke .2s}
 .ring.over .val{stroke:var(--red)}
 .ring .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.ring .mid b{font-size:22px;font-weight:700;letter-spacing:-.022em;font-variant-numeric:tabular-nums;line-height:1.1;white-space:nowrap}
+.ring .mid b{font-size:22px;font-weight:700;letter-spacing:-.012em;font-variant-numeric:tabular-nums;line-height:1.1;white-space:nowrap}
 .ring .mid span{font-size:12px;color:var(--lab2);letter-spacing:0}
-.sum-r{flex:1;min-width:0;display:grid;gap:9px}
+.sum-r{flex:1;min-width:110px;display:grid;gap:9px}
 .kv{display:flex;justify-content:space-between;gap:8px;font-size:15px;letter-spacing:-.016em}
 .kv span{color:var(--lab2)}
 .kv b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.macros{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:10px 16px 16px}
+.macros{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:12px;padding:10px 16px 16px}
 .mac{min-width:0}
 .mac .ml{display:flex;justify-content:space-between;gap:4px;font-size:13px;letter-spacing:-.006em;color:var(--lab2)}
 .mac .mv{font-size:15px;font-weight:600;letter-spacing:-.016em;font-variant-numeric:tabular-nums;white-space:nowrap;margin-top:6px}
@@ -219,7 +244,7 @@ button.fr:active{background:var(--f4)}
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
 .fs{display:block;font-size:13px;letter-spacing:-.006em;color:var(--lab2);margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fk{flex:none;font-size:17px;font-variant-numeric:tabular-nums;color:var(--lab);text-align:right;white-space:nowrap}
+.fk{flex:none;font-size:17px;letter-spacing:-.026em;font-variant-numeric:tabular-nums;color:var(--lab);text-align:right;white-space:nowrap}
 .fk small{display:block;font-size:12px;color:var(--lab2);letter-spacing:0}
 .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:1px 5px;border-radius:4px;
   background:var(--f3);color:var(--lab2);margin-right:5px;vertical-align:1px}
@@ -234,11 +259,12 @@ button.fr:active{background:var(--f4)}
   background:var(--thumb);box-shadow:var(--thumb-sh);z-index:0;opacity:0;
   transition:transform .26s var(--spring),width .26s var(--spring),opacity .16s,background .2s}
 .seg.on .thumb{opacity:1}
-.seg button{position:relative;z-index:1;flex:1;min-width:0;border-radius:7px;padding:7px 6px;
+.seg button{position:relative;z-index:1;flex:1;min-width:0;border-radius:7px;padding:6px 3px;
   font-size:13px;font-weight:500;letter-spacing:-.006em;color:var(--lab);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .2s,transform .12s}
 .seg button:active{transform:scale(.95)}
-.seg button::after{content:"";position:absolute;left:-1.5px;top:6px;bottom:6px;width:1px;
+/* The divider sits inside its own button, so overflow:hidden cannot clip it. */
+.seg button::after{content:"";position:absolute;left:0;top:5px;bottom:5px;width:1px;
   background:var(--sep);opacity:0;transition:opacity .2s}
 .seg button:not(:first-of-type)::after{opacity:1}
 .seg button[aria-pressed="true"]::after,
@@ -253,23 +279,23 @@ button.fr:active{background:var(--f4)}
 .tile{background:var(--card);border-radius:12px;padding:12px 14px;min-width:0}
 .tile span{display:block;font-size:13px;letter-spacing:-.006em;color:var(--lab2);margin-bottom:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tile b{font-size:22px;font-weight:600;letter-spacing:-.022em;font-variant-numeric:tabular-nums;
+.tile b{font-size:22px;font-weight:600;letter-spacing:-.012em;font-variant-numeric:tabular-nums;
   display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile b small{font-size:15px;font-weight:500;color:var(--lab2);letter-spacing:-.016em}
-.tile small.s{display:block;font-size:13px;color:var(--lab2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile small.s{display:block;font-size:13px;letter-spacing:-.006em;color:var(--lab2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chart{padding:14px 12px 10px}
 .chart svg{width:100%;height:auto;overflow:visible}
 .chart .gl{stroke:var(--sep);stroke-width:.5}
-.chart .ax{fill:var(--lab2);font-size:11px;letter-spacing:0;font-family:var(--sans)}
+.chart .ax{fill:var(--lab2);font-size:11px;letter-spacing:.006em;font-family:var(--sans)}
 .chart .tl{stroke:var(--tint);stroke-width:2.2;fill:none;stroke-linejoin:round;stroke-linecap:round}
 .chart .pt{fill:var(--card);stroke:var(--tint);stroke-width:1.6}
 .chart .bq{fill:var(--green)}
-.chart .bq.o{fill:var(--orange)}
+.chart .bq.o{fill:var(--red)}
 .chart .tg{stroke:var(--lab2);stroke-width:1.2;stroke-dasharray:4 4}
 .chart-cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:14px 16px 0}
-.chart-cap b{font-size:22px;font-weight:600;letter-spacing:-.022em;font-variant-numeric:tabular-nums;white-space:nowrap}
-.chart-cap span{font-size:13px;color:var(--lab2);text-align:right}
-.legend{display:flex;gap:14px;padding:0 16px 12px;font-size:12px;color:var(--lab2)}
+.chart-cap b{font-size:22px;font-weight:600;letter-spacing:-.012em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chart-cap span{font-size:13px;letter-spacing:-.006em;color:var(--lab2);text-align:right}
+.legend{display:flex;gap:14px;padding:0 16px 12px;font-size:12px;letter-spacing:0;color:var(--lab2)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 
 /* ==========================================================================
@@ -277,9 +303,9 @@ button.fr:active{background:var(--f4)}
    ========================================================================== */
 .search{position:relative;display:flex;align-items:center;gap:7px;height:36px;
   background:var(--f3);border-radius:10px;padding:0 9px;color:var(--lab2)}
-.search input{flex:1;min-width:0;border:0;background:none;font-size:17px;height:100%;padding:0}
+.search input{flex:1;min-width:0;border:0;background:none;font-size:17px;letter-spacing:-.026em;height:100%;padding:0}
 .search input::placeholder{color:var(--lab2)}
-.search .clr{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+.search .clr{width:36px;height:36px;margin-right:-7px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--lab2);flex:none}
 
 /* ==========================================================================
@@ -291,8 +317,9 @@ button.fr:active{background:var(--f4)}
 .btn:active:not(:disabled){transform:scale(.98);opacity:.85}
 .btn:disabled{background:var(--f3);color:var(--lab3);cursor:default}
 .btn.ghost{background:var(--f3);color:var(--tint);margin-top:9px}
-.btn.danger{background:var(--f3);color:var(--red);margin-top:9px}
+.btn.danger{background:var(--f3);color:var(--red-text);margin-top:9px}
 .btn.link{background:none;color:var(--tint);font-weight:400;padding:12px;margin-top:4px}
+.btn.link:disabled{color:var(--lab3)}
 .acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 2px}
 .acts.two{grid-template-columns:1fr 1fr}
 .act{display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 4px 10px;border-radius:12px;
@@ -310,7 +337,7 @@ button.fr:active{background:var(--f4)}
 /* Hidden until a swipe starts: a row of fractional height lets the red edge
    bleed past the row covering it otherwise. */
 .sw-act{position:absolute;top:0;right:0;bottom:0;width:96px;background:var(--red);color:#fff;
-  font-size:15px;font-weight:500;display:flex;align-items:center;justify-content:center;visibility:hidden}
+  font-size:15px;font-weight:500;letter-spacing:-.016em;display:flex;align-items:center;justify-content:center;visibility:hidden}
 .sw.reveal .sw-act{visibility:visible}
 .sw-act:active{filter:brightness(.88)}
 .sw-in{position:relative;z-index:1;background:var(--card);
@@ -325,7 +352,7 @@ button.fr:active{background:var(--f4)}
   -webkit-backdrop-filter:blur(22px) saturate(180%);backdrop-filter:blur(22px) saturate(180%);
   box-shadow:inset 0 .5px 0 var(--sep);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabbar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
-.tabbar button{position:relative;padding:7px 0 5px;color:var(--lab2);font-size:10px;font-weight:500;
+.tabbar button{position:relative;padding:7px 0 5px;color:var(--tab-off);font-size:10px;font-weight:500;
   letter-spacing:0;display:flex;flex-direction:column;align-items:center;gap:3px;
   transition:color .18s}
 .tabbar button[aria-current="page"]{color:var(--tint)}
@@ -335,6 +362,9 @@ button.fr:active{background:var(--f4)}
 .tabbar button[aria-current="page"] .on{display:block}
 .tabbar button.due::after{content:"";position:absolute;top:6px;left:calc(50% + 9px);width:8px;height:8px;
   border-radius:50%;background:var(--orange);box-shadow:0 0 0 2px var(--bar)}
+/* Compact height (a phone in landscape): the bar goes inline and the large
+   title steps aside, as on iOS. */
+@media (orientation:landscape) and (max-height:500px){.big{display:none}.tabbar button{flex-direction:row;justify-content:center;gap:6px;padding:4px 0}.tabbar svg{width:22px;height:22px;order:-2}.tabbar button.due::after{position:static;flex:none;order:-1;align-self:flex-start;margin:-2px -3px 0 -11px}main{padding-top:calc(env(safe-area-inset-top,0px) + 56px)}}
 
 /* ==========================================================================
    First run
@@ -346,7 +376,7 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .hero .logo{width:76px;height:76px;border-radius:18px;background:linear-gradient(160deg,#4cd964,#1fa64a);
   display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(52,199,89,.35)}
 .hero h1{font-size:34px;line-height:1.2;font-weight:700;letter-spacing:.011em;margin:18px 0 6px}
-.hero p{margin:0;font-size:17px;line-height:1.35;color:var(--lab2);max-width:320px}
+.hero p{margin:0;font-size:17px;line-height:1.35;letter-spacing:-.026em;color:var(--lab2);max-width:320px}
 .gh{font-size:28px;line-height:1.21;font-weight:700;letter-spacing:.013em;margin:6px 4px 4px}
 .gp{margin:0 4px 6px;font-size:15px;line-height:1.38;letter-spacing:-.016em;color:var(--lab2)}
 .result{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
@@ -359,13 +389,16 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
   transition:opacity .34s var(--ease)}
 .ov-back.clear{background:transparent;transition:none}
 .ov.in .ov-back{opacity:1}
+/* Dismissing is a fade, and the page answers taps at once. */
+.ov.out,.ov.out *{pointer-events:none!important}
 
 .alert-ov{align-items:center;justify-content:center;padding:20px}
 .alert{position:relative;width:270px;max-width:100%;border-radius:14px;overflow:hidden;
-  background:var(--glass);-webkit-backdrop-filter:blur(28px) saturate(180%);
+  background:var(--alert);-webkit-backdrop-filter:blur(28px) saturate(180%);
   backdrop-filter:blur(28px) saturate(180%);box-shadow:var(--pop);text-align:center;
   opacity:0;transform:scale(1.12);transition:opacity .2s,transform .2s var(--spring)}
 .alert-ov.in .alert{opacity:1;transform:scale(1)}
+.alert-ov.out .alert{transform:scale(1);transition:opacity .2s}
 .alert-head{padding:19px 16px 15px}
 .alert-head b{display:block;font-size:17px;font-weight:600;letter-spacing:-.026em}
 .alert-head p{margin:4px 0 0;font-size:13px;line-height:1.35;letter-spacing:-.006em;color:var(--lab)}
@@ -377,17 +410,18 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .alert-acts.stack .alert-btn+.alert-btn{box-shadow:inset 0 .5px 0 var(--sep)}
 .alert-btn:active{background:var(--f3)}
 .alert-btn.cancel{font-weight:600}
-.alert-btn.dest{color:var(--red)}
+.alert-btn.dest{color:var(--red-text)}
 
 .menu-ov{pointer-events:none}
 .menu-ov .ov-back{pointer-events:auto}
-.menu{position:absolute;min-width:232px;max-width:min(300px,calc(100vw - 24px));
+.menu{position:absolute;min-width:min(232px,calc(100vw - 24px));max-width:min(300px,calc(100vw - 24px));
   border-radius:13px;overflow:hidden auto;max-height:min(440px,calc(100vh - 40px));scrollbar-width:thin;
   background:var(--glass);-webkit-backdrop-filter:blur(28px) saturate(180%);
   backdrop-filter:blur(28px) saturate(180%);box-shadow:var(--pop);pointer-events:auto;
   opacity:0;transform:scale(.86);-webkit-overflow-scrolling:touch;
   transition:opacity .16s,transform .22s var(--spring)}
 .menu.in{opacity:1;transform:scale(1)}
+.menu-ov.out .menu{opacity:0;transform:scale(1);transition:opacity .2s}
 .menu-item{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;
   padding:11px 15px;font-size:17px;letter-spacing:-.026em;text-align:left;
   transition:background .12s}
@@ -396,10 +430,10 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .menu-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-item span small{display:block;font-size:13px;color:var(--lab2);letter-spacing:-.006em;white-space:normal}
 .menu-item svg{color:var(--lab)}
-.menu-item.dest,.menu-item.dest svg{color:var(--red)}
+.menu-item.dest,.menu-item.dest svg{color:var(--red-text)}
 .menu-item .ck-i{color:var(--lab);opacity:0}
 .menu-item.sel .ck-i{opacity:1}
-.menu-title{padding:9px 15px 8px;font-size:13px;line-height:1.3;color:var(--lab2);
+.menu-title{padding:9px 15px 8px;font-size:13px;line-height:1.3;letter-spacing:-.006em;color:var(--lab2);
   text-align:center;box-shadow:inset 0 .5px 0 var(--sep)}
 .menu-title:first-child{box-shadow:none}
 .menu-sep{height:8px;background:var(--sep);opacity:.5}
@@ -415,28 +449,33 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .sheet-ov.in .sheet{transform:translateY(0)}
 .grab-zone{padding-top:7px;touch-action:none;cursor:grab;flex:none}
 .grab{width:36px;height:5px;border-radius:3px;background:var(--f1);margin:0 auto}
-.sheet-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:7px 8px 9px;touch-action:none;flex:none}
-.sheet-bar b{font-size:17px;font-weight:600;letter-spacing:-.026em;text-align:center;flex:1;min-width:0;
+.sheet-bar{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:2px 8px 4px;touch-action:none;flex:none}
+.sheet-bar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:.5px;
+  background:var(--sep);opacity:0;transition:opacity .2s}
+.sheet-bar.edge::after{opacity:1}
+.sheet-bar h2{margin:0;font-size:17px;font-weight:600;letter-spacing:-.026em;text-align:center;flex:1;min-width:0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sheet-bar button{min-width:74px;min-height:34px;padding:6px 10px;font-size:17px;color:var(--tint);
+.sheet-bar button{min-width:74px;min-height:44px;padding:6px 10px;font-size:17px;color:var(--tint);
   letter-spacing:-.026em;border-radius:8px;transition:background .12s,opacity .12s}
 .sheet-bar button:active{opacity:.4}
 .sheet-bar button:disabled{color:var(--lab3)}
 .sheet-bar button.l{text-align:left}.sheet-bar button.r{text-align:right;font-weight:600}
 .sheet-body{padding:0 16px calc(env(safe-area-inset-bottom,0px) + 18px);overflow-y:auto;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;flex:1;min-height:0}
-.sheet .shdr{margin-left:4px;margin-right:4px}
-.sheet .foot{margin-left:4px;margin-right:4px}
 
 /* Food detail */
 .fd-name{font-size:20px;font-weight:600;letter-spacing:-.024em;line-height:1.25;margin:2px 4px 2px}
 .fd-src{font-size:13px;color:var(--lab2);margin:0 4px 12px;letter-spacing:-.006em}
 .fd-kcal{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:16px 0 6px}
 .fd-kcal b{font-size:34px;font-weight:700;letter-spacing:.011em;font-variant-numeric:tabular-nums}
-.fd-kcal span{font-size:17px;color:var(--lab2)}
-.unitbtn{display:flex;align-items:center;gap:4px;color:var(--tint);flex:none;max-width:58%;padding:6px 0 6px 6px}
+.fd-kcal span{font-size:17px;letter-spacing:-.026em;color:var(--lab2)}
+/* 44px tall to the finger; the negative margin keeps the row its height. */
+.unitbtn{display:flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--tint);flex:0 1 auto;
+  min-width:44px;max-width:58%;padding:11px 0 11px 6px;margin:-5px 0}
 .unitbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A long portion label ellipsizes rather than squeezing the number. */
+.amt .cin{min-width:72px}
 
 /* Nutrient table */
 .nt-row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 16px;position:relative}
@@ -450,7 +489,7 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .cam .guide{position:absolute;left:12%;right:12%;top:30%;bottom:30%;border-radius:12px;
   box-shadow:0 0 0 2px rgba(255,255,255,.9),0 0 0 999px rgba(0,0,0,.35)}
 .cam .msg{position:absolute;left:0;right:0;bottom:10px;text-align:center;color:#fff;font-size:15px;
-  text-shadow:0 1px 3px rgba(0,0,0,.6)}
+  letter-spacing:-.016em;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 
 /* HUD */
 .hud{position:fixed;left:50%;top:50%;z-index:80;transform:translate(-50%,-50%) scale(.9);
@@ -462,35 +501,62 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .hud svg{margin:0 auto 9px;color:var(--lab)}
 .hud span{font-size:15px;font-weight:500;letter-spacing:-.016em}
 
-/* Calendar (from Habits) */
+/* Calendar (UIDatePicker .inline, from Habits) */
 .cal{-webkit-user-select:none;user-select:none}
 .cal-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px 10px}
 .cal-title{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:8px;
-  font-size:17px;font-weight:600;letter-spacing:-.026em}
+  font-size:17px;font-weight:600;letter-spacing:-.026em;transition:background .15s}
+.cal-title:active{background:var(--f4)}
+.cal-title svg{color:var(--tint);transition:transform .3s var(--spring)}
+.cal.picking .cal-title{color:var(--tint)}
+.cal.picking .cal-title svg{transform:rotate(180deg)}
+.cal.picking .cal-nav{visibility:hidden}
 .cal-nav{display:flex;gap:2px}
 .cal-nav button{width:42px;height:42px;border-radius:50%;color:var(--tint);
   display:flex;align-items:center;justify-content:center;transition:background .15s}
 .cal-nav button:active:not(:disabled){background:var(--f4)}
 .cal-nav button:disabled{color:var(--lab3)}
 .cal-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px}
-.cal-dow i{font-size:13px;font-weight:600;color:var(--lab2);text-align:center;font-style:normal}
+.cal-dow i{font-size:13px;font-weight:600;letter-spacing:-.006em;color:var(--lab2);text-align:center;font-style:normal}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px 0}
-.cal-grid>*{position:relative;width:100%;aspect-ratio:1;max-height:44px;border-radius:50%;
+.cal-grid.slide-l{animation:sl .26s var(--ease)}
+.cal-grid.slide-r{animation:sr .26s var(--ease)}
+@keyframes sl{from{opacity:.2;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes sr{from{opacity:.2;transform:translateX(-16px)}to{opacity:1;transform:none}}
+/* At most 44px wide, so the selection stays a circle on wide phones. */
+.cal-grid>*{position:relative;width:min(100%,44px);aspect-ratio:1;border-radius:50%;
   display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:400;
-  letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:0 auto;
+  letter-spacing:-.024em;font-variant-numeric:tabular-nums;margin:0 auto;
   transition:background .2s var(--spring),color .18s,transform .2s var(--spring)}
 .cal-grid .pad{visibility:hidden}
 .cal-grid .dim{color:var(--lab3)}
 .cal-grid .now{color:var(--tint);font-weight:600}
+.cal-grid .now.dim{color:var(--lab3)}
 .cal-grid .sel{background:var(--tint);color:#fff;font-weight:600}
 .cal-grid button:not(:disabled):active{transform:scale(.86)}
 .cal-grid em{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
   width:5px;height:5px;border-radius:50%;background:var(--green)}
 .cal-grid .sel em{background:#fff}
+.cal-wheels{display:none;grid-template-columns:1.4fr 1fr;position:relative;align-items:center}
+.cal.picking .cal-wheels{display:grid}
+.cal.picking .cal-dow,.cal.picking .cal-grid{display:none}
 
-@media (prefers-reduced-motion:reduce){
-  .sheet,.ov-back,.alert,.menu,.hud,.seg .thumb,.sw-in,.ring .val,.bar span{transition:none!important}
-}
+/* Wheel (UIPickerView) */
+.wheels{position:relative}
+.wheels::before{content:"";position:absolute;left:0;right:0;top:50%;height:36px;
+  transform:translateY(-50%);border-radius:9px;background:var(--f4);pointer-events:none}
+.wheel{height:180px;overflow-y:scroll;scroll-snap-type:y mandatory;padding:72px 0;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;position:relative;
+  -webkit-mask-image:linear-gradient(transparent,#000 26%,#000 74%,transparent);
+  mask-image:linear-gradient(transparent,#000 26%,#000 74%,transparent)}
+.wheel::-webkit-scrollbar{display:none}
+.wheel i{display:flex;align-items:center;justify-content:center;height:36px;
+  scroll-snap-align:center;font-size:20px;font-style:normal;color:var(--lab2);
+  letter-spacing:-.024em;transition:color .18s,opacity .18s;opacity:.6}
+.wheel i.on{color:var(--lab);opacity:1;font-weight:500}
+.wheel i.off{opacity:.3}
+
+@media (prefers-reduced-motion:reduce){.sheet,.ov-back,.alert,.menu,.hud,.seg .thumb,.sw-in,.bar span,.ring .val,.tgl,.tgl span,.prayer i,.ck,.cal-title svg{transition:none!important}.navbar .nt{transform:none;transition:opacity .2s ease}.prayer.pop i,.cal-grid.slide-l,.cal-grid.slide-r{animation:none}}
 </style>
 </head>
 <body>
@@ -506,8 +572,8 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
       <button class="arrow" id="prevDay" aria-label="Previous day">
         <svg width="13" height="22" viewBox="0 0 13 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 1.5 2.5 11 11 20.5"/></svg>
       </button>
-      <button class="dlabel" id="dateBtn" aria-label="Choose a date"><span id="dateLabel"></span>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="17" rx="3.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
+      <button class="dlabel" id="dateBtn"><span id="dateLabel"></span><span class="sr">, choose a date</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><rect x="3" y="4.5" width="18" height="17" rx="3.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>
       </button>
       <button class="arrow" id="nextDay" aria-label="Next day">
         <svg width="13" height="22" viewBox="0 0 13 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 1.5 10.5 11 2 20.5"/></svg>
@@ -517,10 +583,10 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
     <div class="card" style="margin-top:10px" id="summary"></div>
     <div id="meals"></div>
 
-    <div class="shdr"><span class="t">Body</span></div>
+    <div class="shdr"><h2 class="t">Body</h2></div>
     <div class="card">
-      <button class="cell" id="weightRow"><span class="cl">Weight</span><span class="cv" id="weightVal"></span></button>
-      <button class="cell" id="nutriRow"><span class="cl">Nutrition details</span><span class="cv" id="nutriVal"></span></button>
+      <button class="cell" id="weightRow"><span class="cl">Weight</span><span class="cv" id="weightVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
+      <button class="cell" id="nutriRow"><span class="cl">Nutrition details</span><span class="cv" id="nutriVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
     </div>
   </section>
 
@@ -529,7 +595,8 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
     <div class="seg" id="libSeg" role="group" aria-label="Library"><span class="thumb"></span><button data-v="foods">Foods</button><button data-v="recipes">Recipes</button><button data-v="meals">Meals</button></div>
     <div class="search" style="margin-top:12px">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 4.5 4.5"/></svg>
-      <input id="libSearch" type="search" placeholder="Search" autocomplete="off" aria-label="Search the library">
+      <input id="libSearch" type="search" placeholder="Search" autocomplete="off" enterkeyhint="search" aria-label="Search the library">
+      <button class="clr hidden" id="libClear" type="button" aria-label="Clear search"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m3.5 12.1-1.4 1.4L12 13.4l-2.1 2.1-1.4-1.4L10.6 12 8.5 9.9l1.4-1.4L12 10.6l2.1-2.1 1.4 1.4L13.4 12z"/></svg></button>
     </div>
     <div class="card" id="libList" style="margin-top:12px"></div>
     <p class="foot" id="libFoot"></p>
@@ -538,30 +605,30 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 
   <!-- ================= Progress ================= -->
   <section id="v-progress" class="hidden">
-    <div class="seg" id="rangeSeg" role="group" aria-label="Range"><span class="thumb"></span><button data-r="30">30 days</button><button data-r="90">90 days</button><button data-r="365">1 year</button></div>
-    <div class="shdr"><span class="t">Weight</span></div>
+    <div class="seg" id="rangeSeg" role="group" aria-label="Range"><span class="thumb"></span><button data-r="30">30D</button><button data-r="90">90D</button><button data-r="365">1Y</button></div>
+    <div class="shdr"><h2 class="t">Weight</h2></div>
     <div class="card" id="weightCard"></div>
     <button class="btn" id="logWeight">Log weight</button>
-    <div class="shdr"><span class="t">Calories</span></div>
+    <div class="shdr"><h2 class="t">Calories</h2></div>
     <div class="card" id="kcalCard"></div>
     <div class="tiles" id="progTiles" style="margin-top:10px"></div>
-    <div class="shdr"><span class="t">Weigh-ins</span></div>
+    <div class="shdr"><h2 class="t">Weigh-ins</h2></div>
     <div class="card" id="weighins"></div>
   </section>
 
   <!-- ================= Me ================= -->
   <section id="v-me" class="hidden">
-    <div class="shdr" style="margin-top:4px"><span class="t">Daily targets</span></div>
+    <div class="shdr" style="margin-top:4px"><h2 class="t">Daily targets</h2></div>
     <div class="card" id="targetCard"></div>
     <p class="foot" id="targetFoot"></p>
     <div class="card" style="margin-top:22px">
-      <button class="cell" id="editProfile"><span class="cl">Profile and goal</span><span class="cv" id="goalVal"></span></button>
-      <button class="cell" id="editTargets"><span class="cl">Adjust targets</span><span class="cv" id="customVal"></span></button>
+      <button class="cell" id="editProfile"><span class="cl">Profile and goal</span><span class="cv" id="goalVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
+      <button class="cell" id="editTargets"><span class="cl">Adjust targets</span><span class="cv" id="customVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
     </div>
-    <div class="shdr"><span class="t">App</span></div>
+    <div class="shdr"><h2 class="t">App</h2></div>
     <div class="card">
-      <button class="cell" id="themeRow"><span class="cl">Appearance</span><span class="cv" id="themeVal"></span></button>
-      <button class="cell" id="dataRow"><span class="cl">Data and sync</span><span class="cv" id="dataVal"></span></button>
+      <button class="cell" id="themeRow"><span class="cl">Appearance</span><span class="cv" id="themeVal"></span><span class="tintc"><svg width="11" height="15" viewBox="0 0 11 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m1.5 5 4-3.5 4 3.5M1.5 10l4 3.5 4-3.5"/></svg></span></button>
+      <button class="cell" id="dataRow"><span class="cl">Data and sync</span><span class="cv" id="dataVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
       <button class="cell" id="exportRow"><span class="cl tintc">Export backup</span><span class="cv" id="backupVal"></span></button>
     </div>
     <p class="foot">Food data: USDA FoodData Central (public domain) and Open Food Facts (ODbL). Targets are estimates from the Mifflin–St Jeor formula, not medical advice.</p>
@@ -571,23 +638,24 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 <div class="tabbar"><div class="in">
   <button data-tab="diary" aria-current="page">
     <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.8v7.4M4.2 2.8v4.6a2.3 2.3 0 0 0 4.6 0V2.8M6.5 10.2v11M17.6 2.8c-2 1.1-3.3 3.6-3.3 6.9v3.6h3.3v7.9"/></svg>
-    <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.8v7.4M4.2 2.8v4.6a2.3 2.3 0 0 0 4.6 0V2.8M6.5 10.2v11M17.6 2.8c-2 1.1-3.3 3.6-3.3 6.9v3.6h3.3v7.9"/></svg>
+    <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 2.8v7.4M4.2 2.8v4.6a2.3 2.3 0 0 0 4.6 0V2.8M6.5 10.2v11M17.6 13.3v7.9"/><path d="M17.6 2.8c-2 1.1-3.3 3.6-3.3 6.9v3.6h3.3z" fill="currentColor"/></svg>
     Diary</button>
   <button data-tab="foods">
     <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="4.6" cy="6" r="1.3"/><circle cx="4.6" cy="12" r="1.3"/><circle cx="4.6" cy="18" r="1.3"/><path d="M9 6h11.4M9 12h11.4M9 18h11.4"/></svg>
-    <svg class="on" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="4.6" cy="6" r="1.6"/><circle cx="4.6" cy="12" r="1.6"/><circle cx="4.6" cy="18" r="1.6"/><path d="M9 6h11.4M9 12h11.4M9 18h11.4" fill="none"/></svg>
+    <svg class="on" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="4.6" cy="6" r="1.6"/><circle cx="4.6" cy="12" r="1.6"/><circle cx="4.6" cy="18" r="1.6"/><path d="M9 6h11.4M9 12h11.4M9 18h11.4" fill="none"/></svg>
     Foods</button>
   <button data-tab="progress">
     <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 3.4v17.4h17.6"/><path d="m6.8 15.6 4-5 3.4 3 5.4-7"/></svg>
-    <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 3.4v17.4h17.6"/><path d="m6.8 15.6 4-5 3.4 3 5.4-7"/></svg>
+    <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 3.4v17.4h17.6"/><path d="m6.8 15.6 4-5 3.4 3 5.4-7V20.8H6.8z" fill="currentColor"/></svg>
     Progress</button>
   <button data-tab="me" id="meTab">
     <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9.6"/><circle cx="12" cy="9.6" r="3.4"/><path d="M5.6 19.2c1.4-2.6 3.7-3.9 6.4-3.9s5 1.3 6.4 3.9"/></svg>
     <svg class="on" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.8a10.2 10.2 0 1 0 0 20.4 10.2 10.2 0 0 0 0-20.4m0 4.1a3.9 3.9 0 1 1 0 7.8 3.9 3.9 0 0 1 0-7.8m0 14.3c-2.5 0-4.8-1-6.5-2.8 1.5-2.2 3.8-3.4 6.5-3.4s5 1.2 6.5 3.4a9 9 0 0 1-6.5 2.8"/></svg>
-    Me</button>
+    Me<span class="sr" id="meDue"></span></button>
 </div></div>
 
 <div id="gate" class="hidden"></div>
+<div id="live" class="sr" aria-live="polite"></div>
 <div id="ui"></div>
 
 <script>
@@ -674,6 +742,8 @@ const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||
   (navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
 const isInstalled=()=>matchMedia("(display-mode: standalone)").matches||navigator.standalone===true;
 const fmt=(k,o)=>fromKey(k).toLocaleDateString(undefined,o);
+/* Spread into fmt() options: the year only when it is not this one. */
+const yearIf=k=>k.slice(0,4)===todayKey().slice(0,4)?{}:{year:"numeric"};
 const MONTHS=Array.from({length:12},(_,i)=>new Date(2021,i,1).toLocaleDateString(undefined,{month:"long"}));
 const DOW=Array.from({length:7},(_,i)=>new Date(2021,7,1+i).toLocaleDateString(undefined,{weekday:"narrow"}));
 /* Accepts "80,5" as well as "80.5" — an iPhone set to a comma locale types the
@@ -696,7 +766,8 @@ const CHEV='<svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="non
 const PLUS='<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m1 14.5h-2v-3.5H7.5v-2H11V7.5h2V11h3.5v2H13z"/></svg>';
 const DOTS='<svg class="dots" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg>';
 const UPDOWN='<svg width="11" height="15" viewBox="0 0 11 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m1.5 5 4-3.5 4 3.5M1.5 10l4 3.5 4-3.5"/></svg>';
-const WARN='<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.6 1.8 20.4h20.4zm0 4.6 6.4 11.2H5.6zm-1 3.4v3.9h2v-3.9zm0 5.1v2h2v-2z"/></svg>';
+const XMARK='<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20m3.5 12.1-1.4 1.4L12 13.4l-2.1 2.1-1.4-1.4L10.6 12 8.5 9.9l1.4-1.4L12 10.6l2.1-2.1 1.4 1.4L13.4 12z"/></svg>';
+const WARN='<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9.2"/><path d="M12 7.4v6M12 16.4v.2"/></svg>';
 const SEARCH_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><path d="m16 16 4.5 4.5"/></svg>';
 const SCAN_SVG='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 8V5.5a2 2 0 0 1 2-2H8M16 3.5h2.5a2 2 0 0 1 2 2V8M20.5 16v2.5a2 2 0 0 1-2 2H16M8 20.5H5.5a2 2 0 0 1-2-2V16M7.5 8v8M10.5 8v8M13.5 8v8M16.5 8v8"/></svg>';
 const BOLT_SVG='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13.4 2.6 4.8 13.4h6.4l-1 8 8.6-10.8h-6.4z"/></svg>';
@@ -791,20 +862,27 @@ function hasData(){
     ||Object.values(S.meta.recipes).some(live)||Object.values(S.meta.meals).some(live);
 }
 
-/* Portion labels look like "1 cup, chopped" or "3 oz". Splitting off the
-   number lets 1.5 of them read "1.5 cup, chopped" and 2 of them "6 oz". */
+/* Portion labels look like "1 cup, chopped", "1/3 cup" or "3 oz". Only a
+   label carrying a plural count is multiplied out (2 of "3 oz" read "6 oz");
+   the rest read as the amount sheet shows them, "2 × 1 egg". */
 function splitPortion(label){
   const m=/^(\d+(?:[.,]\d+)?|\d+\/\d+)\s+(.+)$/.exec(label||"");
   if(!m)return{num:1,unit:label||"",bare:true};
   const v=m[1].includes("/")?m[1].split("/").reduce((a,b)=>a/b):parseFloat(m[1].replace(",","."));
   return{num:v||1,unit:m[2],bare:false};
 }
+/* Grams first: the subtitle ellipsizes at the end, and they are the one
+   unambiguous quantity. A quick add shows the macros that were entered. */
 function amountText(e){
-  if(e.u==="quick")return "Quick add";
+  if(e.u==="quick"){
+    const n=e.n||[];
+    return [[NI.protein,"protein"],[NI.carbs,"carbs"],[NI.fat,"fat"]].filter(([i])=>n[i]!=null)
+      .map(([i,l])=>`${g1(n[i])} g ${l}`).join(" · ")||"Calories only";
+  }
   if(!e.u||e.u==="g")return `${fmtN(e.g)} g`;
-  const p=splitPortion(e.u);
-  const q=(e.q||1)*p.num;
-  return (p.bare?`${fmtN(e.q,2)} × ${p.unit}`:`${fmtN(q,2)} ${p.unit}`)+` · ${fmtN(e.g)} g`;
+  const q=e.q||1,p=splitPortion(e.u);
+  const amt=q===1?e.u:!p.bare&&p.num!==1&&!e.u.includes("/")?`${fmtN(q*p.num,2)} ${p.unit}`:`${fmtN(q,2)} × ${e.u}`;
+  return `${fmtN(e.g)} g · ${amt}`;
 }
 
 /* ==========================================================================
@@ -965,6 +1043,13 @@ let locks=0;
 function lock(on){locks=Math.max(0,locks+(on?1:-1));document.body.classList.toggle("locked",locks>0)}
 function overlay(cls){
   const root=el("div","ov "+cls);
+  /* Modal for a keyboard and VoiceOver: the page behind goes inert, Escape
+     goes through the top overlay's backdrop, and focus returns afterwards. */
+  const ret=document.activeElement&&document.activeElement.matches("button:focus-visible")?document.activeElement:null;
+  const bg=document.querySelectorAll("body>.navbar,body>main,body>.tabbar,#gate");
+  bg.forEach(n=>n.inert=true);
+  const onKey=e=>{if(e.key==="Escape"&&[...UI.querySelectorAll(".ov.in")].pop()===root){e.preventDefault();root.querySelector(".ov-back").click()}};
+  addEventListener("keydown",onKey);
   UI.appendChild(root);lock(true);
   let closed=false;
   /* Reflow, then flip the class: a real transition that does not need rAF,
@@ -972,7 +1057,10 @@ function overlay(cls){
   root.show=()=>{void root.offsetWidth;root.classList.add("in")};
   root.close=()=>{
     if(closed)return;closed=true;
-    root.classList.remove("in");lock(false);
+    root.classList.remove("in");root.classList.add("out");lock(false);
+    removeEventListener("keydown",onKey);
+    if(!UI.querySelector(".ov.in"))bg.forEach(n=>n.inert=false);
+    if(ret&&ret.isConnected)ret.focus({preventScroll:true});
     if(root.onClosed)try{root.onClosed()}catch(e){}
     setTimeout(()=>root.remove(),460);
   };
@@ -984,7 +1072,10 @@ function alertBox({title,message,actions}){
     const back=el("div","ov-back");
     const box=el("div","alert");
     box.setAttribute("role","alertdialog");box.setAttribute("aria-modal","true");box.tabIndex=-1;
-    box.appendChild(el("div","alert-head",(title?`<b>${esc(title)}</b>`:"")+(message?`<p>${esc(message)}</p>`:"")));
+    const aid="al"+Math.random().toString(36).slice(2);
+    box.appendChild(el("div","alert-head",(title?`<b id="${aid}t">${esc(title)}</b>`:"")+(message?`<p id="${aid}m">${esc(message)}</p>`:"")));
+    if(title)box.setAttribute("aria-labelledby",aid+"t");
+    if(message)box.setAttribute("aria-describedby",aid+"m");
     const acts=el("div","alert-acts"+(actions.length>2?" stack":""));
     actions.forEach((a,i)=>{
       const b=el("button","alert-btn"+(a.style==="destructive"?" dest":"")+(a.style==="cancel"?" cancel":""),esc(a.label));
@@ -1005,10 +1096,13 @@ function menu(anchor,items){
   const root=overlay("menu-ov");
   const back=el("div","ov-back clear");
   const m=el("div","menu");
+  m.setAttribute("role","menu");m.tabIndex=-1;
   items.forEach(it=>{
-    if(it.separator){m.appendChild(el("div","menu-sep"));return}
+    if(it.separator){const sp=el("div","menu-sep");sp.setAttribute("role","separator");m.appendChild(sp);return}
     if(it.title){m.appendChild(el("div","menu-title",esc(it.title)));return}
     const b=el("button","menu-item"+(it.destructive?" dest":"")+(it.selected?" sel":""));
+    if(it.selected!==undefined){b.setAttribute("role","menuitemradio");b.setAttribute("aria-checked",String(!!it.selected))}
+    else b.setAttribute("role","menuitem");
     b.innerHTML=`<span>${esc(it.label)}${it.detail?`<small>${esc(it.detail)}</small>`:""}</span>`+(it.selected!==undefined?CHECK:(it.icon||""));
     b.onclick=()=>{root.close();haptic();it.onSelect&&it.onSelect()};
     m.appendChild(b);
@@ -1027,37 +1121,53 @@ function menu(anchor,items){
   m.style.transformOrigin=`${clampNum(r.left+r.width/2-left,14,Math.max(14,w-14))}px ${from}`;
   m.style.visibility="";
   void m.offsetWidth;m.classList.add("in");
-  root.show();
+  root.show();m.focus({preventScroll:true});
   back.onclick=()=>root.close();
   return root;
 }
 
 /* Bottom sheet, drag the bar down to dismiss. onRight returning false keeps it
-   open, so a form can refuse. */
-function sheet({title,left="Cancel",right,onRight,build,tall}){
+   open, so a form can refuse. An empty left or right hides that button.
+   dirty() says whether Cancel, the backdrop or a drag would lose edits; if so
+   it asks first. Saving never asks. */
+function sheet({title,left="Cancel",right,onRight,build,tall,dirty}){
   const root=overlay("sheet-ov");
   const back=el("div","ov-back");
   const s=el("div","sheet"+(tall?" tall":""));
   const zone=el("div","grab-zone",'<div class="grab"></div>');
   const bar=el("div","sheet-bar");
-  const lb=el("button","l",esc(left));lb.onclick=()=>root.close();
-  const tt=el("b",null,esc(title||""));
+  const lb=el("button","l",esc(left||""));
+  if(!left)lb.style.visibility="hidden";
+  const tt=el("h2",null,esc(title||""));
+  tt.id="sh"+Math.random().toString(36).slice(2);
+  s.setAttribute("role","dialog");s.setAttribute("aria-modal","true");s.setAttribute("aria-labelledby",tt.id);s.tabIndex=-1;
   const rb=el("button","r",esc(right||""));
-  if(right)rb.onclick=()=>{if(onRight&&onRight()===false)return;root.close()};
-  else rb.style.visibility="hidden";
+  /* A successful save takes the keyboard down with the sheet. */
+  rb.onclick=()=>{if(onRight&&onRight()===false)return;if(s.contains(document.activeElement))document.activeElement.blur();root.close()};
+  if(!right)rb.style.visibility="hidden";
   bar.append(lb,tt,rb);
   const body=el("div","sheet-body");
+  body.addEventListener("scroll",()=>bar.classList.toggle("edge",body.scrollTop>0),{passive:true});
   s.append(zone,bar,body);
   root.append(back,s);
-  back.onclick=()=>root.close();
+  const tryClose=()=>{
+    s.style.transform="";
+    let d=false;try{d=!!(dirty&&dirty())}catch(e){}
+    if(d){alertBox({title:"Discard changes?",actions:[{label:"Keep Editing",style:"cancel",value:false},
+      {label:"Discard",style:"destructive",value:true}]}).then(v=>{if(v===true)root.close()});return}
+    root.close();
+  };
+  lb.onclick=tryClose;back.onclick=tryClose;
   root.setTitle=t=>{tt.textContent=t};
-  root.setLeft=t=>{lb.textContent=t};
+  root.setLeft=t=>{lb.textContent=t;lb.style.visibility=t?"":"hidden"};
   root.setRight=(t,enabled=true)=>{rb.textContent=t;rb.style.visibility=t?"":"hidden";rb.disabled=!enabled};
+  /* Return in a form's last field: the same as tapping the trailing button. */
+  root.submit=()=>{if(rb.style.visibility!=="hidden"&&!rb.disabled)rb.click()};
   root.body=body;
   /* A sheet that throws while building must still appear, or its invisible
      backdrop sits over the app and swallows every tap. */
   try{build(body,root)}catch(e){console.error(e);body.appendChild(el("p","foot err","Something went wrong here."))}
-  root.show();
+  root.show();if(!s.contains(document.activeElement))s.focus({preventScroll:true});
 
   let y0=0,dy=0,dragging=false;
   const down=e=>{
@@ -1075,7 +1185,7 @@ function sheet({title,left="Cancel",right,onRight,build,tall}){
   const up=()=>{
     if(!dragging)return;dragging=false;
     s.style.transition="";back.style.opacity="";
-    if(dy>96)root.close();else s.style.transform="";
+    if(dy>96)tryClose();else s.style.transform="";
   };
   [zone,bar].forEach(n=>n.addEventListener("pointerdown",down));
   zone.addEventListener("pointermove",move);
@@ -1084,64 +1194,171 @@ function sheet({title,left="Cancel",right,onRight,build,tall}){
   return root;
 }
 
+/* VoiceOver hears what the HUD shows. */
+const announce=t=>{const L=$("live");if(!L)return;L.textContent="";setTimeout(()=>L.textContent=t,60)};
 let hudTimer=null;
-function hud(text,icon){
+/* {hold:true} keeps it up for a pending action and returns the function that
+   hides it. */
+function hud(text,icon,{hold}={}){
+  announce(text);
   const old=document.querySelector(".hud");if(old)old.remove();
   const n=el("div","hud",(icon||CHECK.replace("ck-i","").replace('width="17" height="17"','width="34" height="34"'))+`<span>${esc(text)}</span>`);
   document.body.appendChild(n);
   void n.offsetWidth;n.classList.add("in");
   clearTimeout(hudTimer);
-  hudTimer=setTimeout(()=>{n.classList.remove("in");setTimeout(()=>n.remove(),300)},1150);
+  const hide=()=>{n.classList.remove("in");setTimeout(()=>n.remove(),300)};
+  if(hold)return hide;
+  hudTimer=setTimeout(hide,1150);
 }
 
-/* --- Inline calendar in a sheet --- */
-function calendar({value,max,onPick}){
+/* --- Wheel picker column (UIPickerView, from Habits) --- */
+const ROW=36;
+function wheel(values,index,onChange){
+  const w=el("div","wheel");
+  w.innerHTML=values.map(v=>`<i>${esc(v)}</i>`).join("");
+  const items=[...w.children];
+  const mark=i=>items.forEach((n,j)=>n.classList.toggle("on",j===i));
+  const at=()=>clampNum(Math.round(w.scrollTop/ROW),0,values.length-1);
+  let idx=clampNum(index,0,values.length-1);mark(idx);
+  w.init=()=>{w.scrollTop=idx*ROW};   /* call once the column is in the document */
+  let raf=null,settle=null;
+  w.addEventListener("scroll",()=>{
+    if(raf)return;
+    raf=requestAnimationFrame(()=>{
+      raf=null;
+      const i=at();
+      if(i!==idx){idx=i;mark(idx);haptic(4)}
+    });
+    clearTimeout(settle);
+    /* Read the position again here: the frame above is polish and may not run. */
+    settle=setTimeout(()=>{const i=at();if(i!==idx){idx=i;mark(idx)}onChange&&onChange(idx)},130);
+  },{passive:true});
+  w.setTo=i=>{idx=clampNum(i,0,values.length-1);mark(idx);w.scrollTo({top:idx*ROW,behavior:"smooth"})};
+  w.get=()=>idx;
+  /* A tap on a row picks it; the scroll that follows commits it. */
+  w.addEventListener("click",e=>{const i=items.indexOf(e.target);if(i>=0&&i!==idx)w.setTo(i)});
+  return w;
+}
+
+/* --- Inline calendar (UIDatePicker .inline, from Habits). Always six weeks,
+   and the wheels take the grid's height, so the sheet never changes size. --- */
+function calendar({value,min,max,onPick}){
   const node=el("div","cal");
+  const selKey=value;
   let view=fromKey(value);view.setDate(1);
+  const minD=fromKey(min),maxD=fromKey(max);
+  minD.setDate(1);
+
   const bar=el("div","cal-bar");
-  const title=el("div","cal-title");
+  const title=el("button","cal-title",
+    `<span></span><span class="sr">, choose month and year</span><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 16.6 5.1 9.7a1.2 1.2 0 0 1 1.7-1.7L12 13.2l5.2-5.2a1.2 1.2 0 0 1 1.7 1.7z"/></svg>`);
+  title.type="button";title.setAttribute("aria-expanded","false");
   const nav=el("div","cal-nav");
   const prev=el("button",null,'<svg width="11" height="18" viewBox="0 0 13 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 1.5 2.5 11 11 20.5"/></svg>');
   const next=el("button",null,'<svg width="11" height="18" viewBox="0 0 13 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 1.5 10.5 11 2 20.5"/></svg>');
+  prev.type=next.type="button";
   prev.setAttribute("aria-label","Previous month");next.setAttribute("aria-label","Next month");
   nav.append(prev,next);bar.append(title,nav);
+
   const dow=el("div","cal-dow",DOW.map(d=>`<i>${esc(d)}</i>`).join(""));
   const grid=el("div","cal-grid");
-  node.append(bar,dow,grid);
-  const maxD=fromKey(max);
-  function draw(){
-    title.textContent=`${MONTHS[view.getMonth()]} ${view.getFullYear()}`;
-    next.disabled=view.getFullYear()>maxD.getFullYear()||(view.getFullYear()===maxD.getFullYear()&&view.getMonth()>=maxD.getMonth());
+  const wheels=el("div","cal-wheels wheels");
+  node.append(bar,dow,grid,wheels);
+
+  const y0=minD.getFullYear(),y1=maxD.getFullYear();
+  const years=Array.from({length:y1-y0+1},(_,i)=>String(y0+i));
+  let mW=null,yW=null;
+
+  /* Months outside min..max stay on the wheel, faded, as on iOS. */
+  const dimOut=()=>{
+    if(!mW)return;
+    const y=y0+yW.get(),lo=keyOf(minD),hi=keyOf(new Date(maxD.getFullYear(),maxD.getMonth(),1));
+    [...mW.children].forEach((n,i)=>{const k=keyOf(new Date(y,i,1));n.classList.toggle("off",k<lo||k>hi)});
+  };
+  const atMin=()=>view.getFullYear()===minD.getFullYear()&&view.getMonth()===minD.getMonth();
+  const atMax=()=>view.getFullYear()===maxD.getFullYear()&&view.getMonth()===maxD.getMonth();
+
+  function draw(dir){
+    title.firstChild.textContent=`${MONTHS[view.getMonth()]} ${view.getFullYear()}`;
+    prev.disabled=atMin();next.disabled=atMax();
     const first=new Date(view.getFullYear(),view.getMonth(),1);
     const n=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
     let html="";
     for(let i=0;i<first.getDay();i++)html+='<b class="pad">0</b>';
     for(let d=1;d<=n;d++){
       const k=keyOf(new Date(view.getFullYear(),view.getMonth(),d));
-      const out=k>max;
-      const cls=[out?"dim":"",k===todayKey()?"now":"",k===value?"sel":""].filter(Boolean).join(" ");
-      html+=`<button type="button" class="${cls}" aria-label="${esc(fmt(k,{weekday:"long",month:"long",day:"numeric"}))}"`+
-        (out?" disabled":` data-k="${k}"`)+`>${d}${!out&&entries(k).length?"<em></em>":""}</button>`;
+      const out=k<min||k>max;
+      const cls=[out?"dim":"",k===todayKey()?"now":"",k===selKey?"sel":""].filter(Boolean).join(" ");
+      html+=`<button type="button" class="${cls}" aria-label="${esc(fmt(k,{weekday:"long",month:"long",day:"numeric",year:"numeric"}))}"`
+        +(k===selKey?' aria-current="date"':"")
+        +(out?" disabled":` data-k="${k}"`)+`>${d}${!out&&entries(k).length>0?"<em></em>":""}</button>`;
     }
+    for(let i=first.getDay()+n;i<42;i++)html+='<b class="pad">0</b>';
+    grid.className="cal-grid";
+    void grid.offsetWidth;
     grid.innerHTML=html;
+    if(dir)grid.classList.add(dir>0?"slide-l":"slide-r");
   }
-  prev.onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()-1,1);draw();haptic(4)};
-  next.onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()+1,1);draw();haptic(4)};
+  function hop(n){
+    const v=new Date(view.getFullYear(),view.getMonth()+n,1);
+    if(keyOf(v)<keyOf(minD))return;
+    const cap=new Date(maxD.getFullYear(),maxD.getMonth(),1);
+    if(keyOf(v)>keyOf(cap))return;
+    view=v;draw(n);haptic(4);
+    if(mW)mW.setTo(view.getMonth());
+    if(yW)yW.setTo(view.getFullYear()-y0);
+  }
+  prev.onclick=()=>hop(-1);
+  next.onclick=()=>hop(1);
   grid.addEventListener("click",e=>{
     const b=e.target.closest("button[data-k]");if(!b)return;
     haptic();
-    grid.querySelectorAll(".sel").forEach(n=>n.classList.remove("sel"));
-    b.classList.add("sel");onPick&&onPick(b.dataset.k);
+    grid.querySelectorAll(".sel").forEach(n=>{n.classList.remove("sel");n.removeAttribute("aria-current")});
+    b.classList.add("sel");b.setAttribute("aria-current","date");
+    onPick&&onPick(b.dataset.k);
   });
-  draw();
+
+  title.onclick=()=>{
+    /* Measured only while the grid is showing; it is display:none while picking. */
+    if(!node.classList.contains("picking"))wheels.style.height=(grid.getBoundingClientRect().bottom-dow.getBoundingClientRect().top)+"px";
+    const on=node.classList.toggle("picking");
+    title.setAttribute("aria-expanded",String(on));
+    if(on&&!mW){
+      const commit=()=>{
+        const y=y0+yW.get(),m=mW.get();
+        const d=new Date(y,m,1);
+        const lo=new Date(minD.getFullYear(),minD.getMonth(),1);
+        const hi=new Date(maxD.getFullYear(),maxD.getMonth(),1);
+        view=d<lo?lo:d>hi?hi:d;
+        if(view.getFullYear()!==y||view.getMonth()!==m){
+          mW.setTo(view.getMonth());yW.setTo(view.getFullYear()-y0);
+        }
+        draw(0);dimOut();
+      };
+      mW=wheel(MONTHS,view.getMonth(),commit);
+      yW=wheel(years,view.getFullYear()-y0,commit);
+      wheels.append(mW,yW);
+      mW.init();yW.init();dimOut();
+    }
+    haptic();
+  };
+
+  draw(0);
   return node;
 }
-function pickDate({value,max=todayKey(),title="Select date"}){
+/* The diary reaches five years back, or further if there is older history. */
+function earliestKey(){
+  const ks=Object.keys(S.days).sort(),floor=shiftKey(todayKey(),-365*5);
+  return ks.length&&ks[0]<floor?ks[0]:floor;
+}
+/* Opens the calendar in a sheet. Resolves with a date key, or null. right:""
+   hides Today where today is not an answer. */
+function pickDate({value,min=earliestKey(),max=todayKey(),title="Select date",right="Today"}){
   return new Promise(res=>{
     let done=false;
-    const root=sheet({title,left:"Cancel",right:"Today",
+    const root=sheet({title,left:"Cancel",right,
       onRight:()=>{if(!done){done=true;res(todayKey())}},
-      build:body=>body.appendChild(calendar({value,max,onPick:k=>{
+      build:body=>body.appendChild(calendar({value,min,max,onPick:k=>{
         if(done)return;done=true;res(k);setTimeout(()=>root.close(),210);
       }}))});
     root.onClosed=()=>{if(!done){done=true;res(null)}};
@@ -1236,7 +1453,9 @@ function swipeRow(inner,onTap,onDelete){
   act.onclick=()=>{closeRow();onDelete()};
   inner.addEventListener("click",()=>{
     if(row.dataset.swiping)return;
-    if(openRow===row){closeRow();return}
+    /* A tap anywhere while a row is open only closes it. A row that a
+       re-render has removed no longer counts as open. */
+    if(openRow){const was=openRow;closeRow();if(was.isConnected)return}
     onTap&&onTap();
   });
   swipeable(row);
@@ -1575,9 +1794,9 @@ function offToFood(code,p){
 async function handleBarcode(code,onItem){
   const known=Object.values(S.foods).find(f=>live(f)&&f.barcode===code);
   if(known){onItem(foodItem(known));return}
-  hud("Looking it up…",SEARCH_SVG.replace('width="16" height="16"','width="34" height="34"'));
+  const looking=hud("Looking it up…",SEARCH_SVG.replace('width="16" height="16"','width="34" height="34"'),{hold:true});
   let p=null,failed=false;
-  try{p=await offLookup(code)}catch(e){failed=true}
+  try{p=await offLookup(code)}catch(e){failed=true}finally{looking()}
   const food=p?offToFood(code,p):null;
   if(food&&!food.partial){S.foods[food.id]=food;dirtyFood(food.id);onItem(foodItem(food));return}
   const go=await alertBox({
@@ -1598,17 +1817,17 @@ function promptText({title,placeholder="",value="",numeric,check,right="Done",no
     const root=sheet({title,left:"Cancel",right,
       onRight:()=>{
         const v=inp.value.trim();const c=check?check(v):!!v;
-        if(c!==true){hud(typeof c==="string"?c:"Fill this in",WARN);return false}
+        if(c!==true){hud(typeof c==="string"?c:"Fill this in",WARN);inp.focus();return false}
         done=true;res(v);
       },
-      build:body=>{
+      build:(body,sh)=>{
         const card=el("div","card");
-        card.innerHTML=`<div class="cell"><input class="cin left" autocomplete="off" autocorrect="off" spellcheck="false"
-          ${numeric?'inputmode="numeric"':""} placeholder="${esc(placeholder)}" aria-label="${esc(title)}"></div>`;
+        card.innerHTML=`<label class="cell"><input class="cin left" autocomplete="off" autocorrect="off" spellcheck="false"
+          ${numeric?'inputmode="numeric"':""} placeholder="${esc(placeholder)}" aria-label="${esc(title)}"></label>`;
         inp=card.querySelector("input");inp.value=value;
-        inp.addEventListener("keydown",e=>{if(e.key==="Enter")root.querySelector(".sheet-bar .r").click()});
         body.appendChild(card);
         if(note)body.appendChild(el("p","foot",esc(note)));
+        formKeys(body,sh.submit);
       }});
     root.onClosed=()=>{if(!done){done=true;res(null)}};
     setTimeout(()=>inp&&inp.focus(),80);
@@ -1616,13 +1835,30 @@ function promptText({title,placeholder="",value="",numeric,check,right="Done",no
 }
 
 /* Labelled input row: <label> so a tap anywhere on the row focuses it. */
-function fieldRow(label,{value="",placeholder="",unit="",mode="decimal",left,attrs=""}={}){
+/* unit:"" on a numeric row with no unit keeps the column, so the values in a
+   card share one right edge; text rows leave unit out. */
+function fieldRow(label,{value="",placeholder="",unit=null,mode="decimal",left,attrs=""}={}){
   return `<label class="cell"><span class="cl" style="flex:none;max-width:52%">${esc(label)}</span>`+
     `<input class="cin${left?" left":""}" ${mode?`inputmode="${mode}"`:""} autocomplete="off" autocorrect="off" spellcheck="false" ${attrs}
       value="${esc(value)}" placeholder="${esc(placeholder)}" aria-label="${esc(label)}">`+
-    (unit?`<span class="unit">${esc(unit)}</span>`:"")+`</label>`;
+    (unit!=null?`<span class="unit">${esc(unit)}</span>`:"")+`</label>`;
 }
-const selectOnFocus=root=>root.querySelectorAll("input").forEach(i=>i.addEventListener("focus",()=>{try{i.select()}catch(e){}}));
+/* Deferred, so the caret a tap places cannot undo the selection. */
+const selectOnFocus=root=>root.querySelectorAll("input").forEach(i=>i.addEventListener("focus",()=>setTimeout(()=>{try{i.select()}catch(e){}},0)));
+/* Return walks the fields, as the keyboard's Next key does, and submits from
+   the last one. */
+function formKeys(root,submit){
+  const ins=[...root.querySelectorAll("input:not([type=search]):not(:disabled)")];
+  ins.forEach((i,j)=>{
+    const last=j===ins.length-1;
+    i.setAttribute("enterkeyhint",last?"done":"next");
+    i.addEventListener("keydown",e=>{
+      if(e.key!=="Enter"||e.isComposing)return;
+      e.preventDefault();
+      if(!last)ins[j+1].focus();else if(submit)submit();
+    });
+  });
+}
 
 /* ---- Search + add ----
    mode "log" adds to the diary and stays open for the next item;
@@ -1631,8 +1867,14 @@ function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
   let timer=null,added=0,input,list;
   const day=k||cur;
   const root=sheet({title:title||(mode==="log"?MEAL_NAME[meal]:"Add an item"),left:"Cancel",tall:true,build:body=>{
-    const sw=el("div","search",SEARCH_SVG+`<input type="search" placeholder="Search foods" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search foods" enterkeyhint="search">`);
+    const sw=el("div","search",SEARCH_SVG+`<input type="search" placeholder="Search foods" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Search foods" enterkeyhint="search">`+
+      `<button class="clr hidden" type="button" aria-label="Clear search">${XMARK}</button>`);
     input=sw.querySelector("input");
+    input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();input.blur()}});
+    /* The picker stays open for the next item, so clearing is routine. A
+       pending debounced render must not run after it. */
+    const clr=sw.querySelector(".clr");
+    clr.onclick=()=>{input.value="";clr.classList.add("hidden");input.focus();clearTimeout(timer);render()};
     const acts=el("div","acts"+(mode==="log"?"":" two"));
     acts.innerHTML=`<button class="act" type="button" data-a="scan">${SCAN_SVG}<span>Scan</span></button>`+
       (mode==="log"?`<button class="act" type="button" data-a="quick">${BOLT_SVG}<span>Quick add</span></button>`:"")+
@@ -1645,10 +1887,10 @@ function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
       if(a.dataset.a==="quick")openQuickAdd({k:day,meal,onDone:m=>afterAdd(m)});
       if(a.dataset.a==="new")openFoodEditor(null,{onSaved:f=>choose(foodItem(f))});
     });
-    input.addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(render,110)});
+    input.addEventListener("input",()=>{clr.classList.toggle("hidden",!input.value);clearTimeout(timer);timer=setTimeout(render,110)});
   }});
   function afterAdd(m){
-    added++;root.setLeft("Done");renderAll();
+    added++;root.setLeft("");root.setRight("Done");renderAll();
     hud(`Added to ${MEAL_NAME[m]}`);
     if(!input.value)render();
   }
@@ -1673,7 +1915,7 @@ function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
   };
   function section(title,rows){
     if(!rows.length)return;
-    list.appendChild(el("div","shdr",`<span class="t">${esc(title)}</span>`));
+    list.appendChild(el("div","shdr",`<h2 class="t">${esc(title)}</h2>`));
     const c=el("div","card");rows.forEach(r=>c.appendChild(r));list.appendChild(c);
   }
   function render(){
@@ -1705,7 +1947,9 @@ function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
 }
 
 /* ---- Amount: how much of one item ---- */
-function openAmount(item,{mode="log",meal="s",k,entry,onDone}={}){
+/* right:"Done" for a sub-edit inside an editor that has its own Save. Only a
+   new amount takes focus. */
+function openAmount(item,{mode="log",meal="s",k,entry,onDone,onRemove,right,focus=mode!=="edit"}={}){
   const day=k||cur;
   let u=item.u||"g",q=item.q;
   if(q==null){
@@ -1716,19 +1960,19 @@ function openAmount(item,{mode="log",meal="s",k,entry,onDone}={}){
   if(unitGrams(item,u)==null){u="g";q=entry?entry.g:100}
   let m=entry?entry.m:meal;
   let inp,unitLbl,out;
-  const title=mode==="edit"?"Edit entry":mode==="pick"?"Amount":MEAL_NAME[m]||"Add";
-  const root=sheet({title,left:"Cancel",right:mode==="edit"?"Save":"Add",onRight:()=>save(),build:body=>{
+  const title=mode==="edit"?"Edit entry":mode==="pick"?(onRemove?"Edit item":"Amount"):MEAL_NAME[m]||"Add";
+  const root=sheet({title,left:"Cancel",right:right||(mode==="edit"?"Save":"Add"),onRight:()=>save(),build:(body,sh)=>{
     body.innerHTML=`<div class="fd-name">${esc(item.name)}</div>
       <div class="fd-src">${esc(item.src)} · ${per100Text(item.n)}</div>
-      <div class="card"><div class="cell"><span class="cl" style="flex:none">Amount</span>
+      <div class="card"><label class="cell amt"><span class="cl" style="flex:none">Amount</span>
         <input class="cin" inputmode="decimal" autocomplete="off" aria-label="Amount">
-        <button class="unitbtn" type="button" aria-label="Unit"><span></span>${UPDOWN}</button></div></div>
+        <button class="unitbtn" type="button" aria-label="Unit"><span></span>${UPDOWN}</button></label></div>
       <div class="card" style="margin-top:12px"><div class="fd-kcal"><b class="num">0</b><span>kcal</span></div><div class="macros"></div></div>`;
     inp=body.querySelector("input");unitLbl=body.querySelector(".unitbtn span");out=body.querySelector(".card:last-child");
     inp.value=fmtQ(q);
     inp.addEventListener("input",preview);
-    inp.addEventListener("focus",()=>{try{inp.select()}catch(e){}});
-    inp.addEventListener("keydown",e=>{if(e.key==="Enter")root.querySelector(".sheet-bar .r").click()});
+    inp.addEventListener("focus",()=>setTimeout(()=>{try{inp.select()}catch(e){}},0));
+    formKeys(body,sh.submit);
     body.querySelector(".unitbtn").onclick=e=>{
       const opts=[["g","grams"],...(item.portions||[]).map(p=>[p[0],`${p[0]} · ${fmtN(p[1],1)} g`])];
       menu(e.currentTarget,opts.map(([v,label])=>({label,selected:v===u,onSelect:()=>{
@@ -1741,21 +1985,32 @@ function openAmount(item,{mode="log",meal="s",k,entry,onDone}={}){
       }})));
     };
     if(mode!=="pick"){
-      body.appendChild(el("div","shdr",'<span class="t">Meal</span>'));
+      body.appendChild(el("div","shdr",'<h2 class="t">Meal</h2>'));
       body.appendChild(makeSeg(MEALS,m,v=>{m=v;if(mode==="log")root.setTitle(MEAL_NAME[v])},"Meal"));
     }
     if(mode==="edit"){
       const del=el("button","btn danger","Delete entry");
-      del.onclick=()=>{delEntry(day,entry.id);root.close();renderAll();hud("Deleted");onDone&&onDone(m)};
+      del.onclick=async()=>{
+        if(!await confirmBox("Delete this entry?",`${entry.name} · ${amountText(entry)}`))return;
+        delEntry(day,entry.id);root.close();renderAll();hud("Deleted");onDone&&onDone(m);
+      };
+      body.appendChild(del);
+    }
+    /* The swipe's equivalent for an ingredient. No alert: Cancel on the
+       recipe undoes it. */
+    if(onRemove){
+      const del=el("button","btn danger","Remove");
+      del.onclick=()=>{root.close();onRemove()};
       body.appendChild(del);
     }
     preview();
   }});
   paintIn(root);
-  if(mode!=="edit")setTimeout(()=>{inp.focus()},120);
+  if(focus)setTimeout(()=>{inp.focus()},120);
   function grams(){const v=num(inp.value);return v>0?v*(unitGrams(item,u)||1):0}
   function preview(){
     unitLbl.textContent=u==="g"?"g":u;
+    unitLbl.parentElement.setAttribute("aria-label","Unit: "+(u==="g"?"grams":u));
     const gg=grams(),f=gg/100,n=item.n||[];
     out.querySelector(".fd-kcal b").textContent=kc((n[0]||0)*f);
     const cell=(label,i,c)=>`<div class="mac"><div class="ml"><span><i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--${c});margin-right:5px"></i>${label}</span></div>`+
@@ -1764,7 +2019,7 @@ function openAmount(item,{mode="log",meal="s",k,entry,onDone}={}){
   }
   function save(){
     const v=num(inp.value),gg=grams();
-    if(!(v>0)||!(gg>0)){hud("Enter an amount",WARN);return false}
+    if(!(v>0)||!(gg>0)){hud("Enter an amount",WARN);inp.focus();return false}
     const x={name:item.name,ref:item.ref,n:item.n,g:Math.round(gg*10)/10,q:v,u};
     if(mode==="pick"){onDone&&onDone(x);return}
     const e=Object.assign(entry?{id:entry.id,c:entry.c}:{},x,{m});
@@ -1783,27 +2038,31 @@ function openQuickAdd({k,meal="s",entry,onDone}={}){
   const root=sheet({title:"Quick add",left:"Cancel",right:entry?"Save":"Add",onRight:()=>{
     const v=i=>num(root.body.querySelectorAll("input")[i].value);
     const kcal=v(0);
-    if(!(kcal>0)){hud("Enter the calories",WARN);return false}
+    if(!(kcal>0)){hud("Enter the calories",WARN);root.body.querySelector("input").focus();return false}
     const n=new Array(N.length).fill(null);
     n[0]=kcal;n[NI.protein]=v(1);n[NI.carbs]=v(2);n[NI.fat]=v(3);
     const name=root.body.querySelectorAll("input")[4].value.trim()||"Quick add";
     putEntry(day,Object.assign(entry?{id:entry.id,c:entry.c}:{},{m,name,ref:"q",n,g:100,q:1,u:"quick"}));
-    renderAll();onDone&&onDone(m);
-  },build:body=>{
-    body.innerHTML=`<div class="card">${fieldRow("Calories",{unit:"kcal",value:n0[0]!=null?fmtN(n0[0]):"",mode:"numeric"})}
-      ${fieldRow("Protein",{unit:"g",value:n0[1]!=null?n0[1]:"",placeholder:"optional"})}
-      ${fieldRow("Carbs",{unit:"g",value:n0[3]!=null?n0[3]:"",placeholder:"optional"})}
-      ${fieldRow("Fat",{unit:"g",value:n0[2]!=null?n0[2]:"",placeholder:"optional"})}
+    renderAll();if(entry)hud("Saved");onDone&&onDone(m);
+  },build:(body,sh)=>{
+    /* Never pre-fill with a grouped number: num() reads "1,200" as 1.2. */
+    body.innerHTML=`<div class="card">${fieldRow("Calories",{unit:"kcal",value:n0[0]!=null?String(Math.round(n0[0])):"",mode:"numeric"})}
+      ${fieldRow("Protein",{unit:"g",value:n0[1]!=null?n0[1]:"",placeholder:"Optional"})}
+      ${fieldRow("Carbs",{unit:"g",value:n0[3]!=null?n0[3]:"",placeholder:"Optional"})}
+      ${fieldRow("Fat",{unit:"g",value:n0[2]!=null?n0[2]:"",placeholder:"Optional"})}
       ${fieldRow("Name",{value:entry&&entry.name!=="Quick add"?entry.name:"",placeholder:"Quick add",mode:"",left:false})}</div>
       <p class="foot">For when you know roughly what something was but cannot find it.</p>`;
-    body.appendChild(el("div","shdr",'<span class="t">Meal</span>'));
+    body.appendChild(el("div","shdr",'<h2 class="t">Meal</h2>'));
     body.appendChild(makeSeg(MEALS,m,v=>{m=v},"Meal"));
     if(entry){
       const del=el("button","btn danger","Delete entry");
-      del.onclick=()=>{delEntry(day,entry.id);root.close();renderAll();hud("Deleted")};
+      del.onclick=async()=>{
+        if(!await confirmBox("Delete this entry?",`${entry.name} · ${fmtN(entry.n[0])} kcal`))return;
+        delEntry(day,entry.id);root.close();renderAll();hud("Deleted");
+      };
       body.appendChild(del);
     }
-    selectOnFocus(body);
+    selectOnFocus(body);formKeys(body,sh.submit);
   }});
   paintIn(root);
   if(!entry)setTimeout(()=>root.body.querySelector("input").focus(),120);
@@ -1817,8 +2076,11 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
   const f=food||{};const mine=!food||f.mine;
   const serving0=(f.portions||[]).find(p=>/^1 serving/.test(p[0]));
   let basis="100";
-  const root=sheet({title:food?(mine?"Edit food":"Food"):"New food",left:mine?"Cancel":"Close",right:mine?"Save":"",tall:true,
-    onRight:()=>save(),build:body=>{
+  let snap0=null;
+  const snapOf=()=>JSON.stringify([...root.body.querySelectorAll("input")].map(i=>i.value).concat(basis));
+  const root=sheet({title:food?(mine?"Edit food":"Food"):"New food",left:mine?"Cancel":"",right:mine?(food?"Save":"Add"):"Done",tall:true,
+    dirty:()=>mine&&snap0!==null&&snapOf()!==snap0,
+    onRight:()=>mine?save():undefined,build:(body,sh)=>{
     const n=f.n||[];
     const val=(i,key)=>n[i]==null?"":key==="salt"?Math.round(n[i]/400*100)/100:n[i];
     body.innerHTML=`<div class="card">
@@ -1826,17 +2088,31 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
         ${fieldRow("Brand",{value:f.brand||brand||"",placeholder:"Optional",mode:""})}
         ${fieldRow("Barcode",{value:f.barcode||barcode||"",placeholder:"Optional",mode:"numeric"})}
       </div>
-      <div class="shdr"><span class="t">Nutrition as on the label</span></div>
+      <div class="shdr"><h2 class="t">Nutrition as on the label</h2></div>
       <div class="card"><div class="segwrap" data-basis></div>
-        ${fieldRow("Serving size",{value:serving0?serving0[1]:"",placeholder:"optional",unit:"g"})}</div>
+        ${fieldRow("Serving size",{value:serving0?serving0[1]:"",placeholder:"Optional",unit:"g"})}</div>
       <div class="card" style="margin-top:12px">${LABEL_FIELDS.map(([l,key,i,u])=>fieldRow(l,{value:val(i,key),placeholder:key==="kcal"?"Required":"",unit:u})).join("")}</div>
       <p class="foot">${mine?"Foods you add are shared with everyone in the group, so a product only has to be typed in once. Your diary stays private.":"Added by someone else in the group, so only they can change it."}</p>`;
-    body.querySelector("[data-basis]").appendChild(makeSeg([["100","Per 100 g"],["serving","Per serving"]],basis,v=>{basis=v},"Values are"));
-    if(!mine)body.querySelectorAll("input").forEach(i=>i.disabled=true);
-    selectOnFocus(body);
+    /* The toggle converts what is on screen, so a food never changes by being
+       re-read. Per serving needs the serving size to convert with. */
+    const seg=makeSeg([["100","Per 100 g"],["serving","Per serving"]],basis,v=>{
+      if(v===basis)return;
+      const ins=[...body.querySelectorAll("input")],sv=num(ins[3].value),vals=ins.slice(4);
+      if(vals.some(i=>num(i.value)!=null)){
+        if(!(sv>0)){segSet(seg,basis);hud("Enter the serving size first",WARN);ins[3].focus();return}
+        const k=v==="serving"?sv/100:100/sv;
+        vals.forEach(i=>{const x=num(i.value);if(x!=null)i.value=String(Math.round(x*k*100)/100)});
+      }
+      basis=v;
+    },"Values are");
+    body.querySelector("[data-basis]").appendChild(seg);
+    /* Someone else's food is read-only, and stored values are always per 100 g. */
+    if(!mine){body.querySelectorAll("input").forEach(i=>i.disabled=true);body.querySelector("[data-basis]").remove();
+      body.querySelector(".shdr .t").textContent="Nutrition per 100 g"}
+    selectOnFocus(body);formKeys(body,sh.submit);
     const log=el("button","btn ghost","Log it");
     if(food&&live(food)){
-      log.onclick=()=>{root.close();setTimeout(()=>openAmount(foodItem(food),{mode:"log",meal:guessMeal(),k:cur,onDone:m=>hud(`Added to ${MEAL_NAME[m]}`)}),300)};
+      log.onclick=()=>{root.close();setTimeout(()=>openAmount(foodItem(food),{mode:"log",meal:guessMeal(),k:todayKey(),onDone:m=>hud(`Added to ${MEAL_NAME[m]}`)}),300)};
       body.appendChild(log);
     }
     if(food&&mine){
@@ -1849,23 +2125,29 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
     }
   }});
   paintIn(root);
+  snap0=snapOf();
   function save(){
     const ins=[...root.body.querySelectorAll("input")];
     const nm=ins[0].value.trim(),br=ins[1].value.trim(),bc=ins[2].value.replace(/\D/g,"");
     const sv=num(ins[3].value);
-    if(!nm){hud("Give it a name",WARN);return false}
+    if(!nm){hud("Give it a name",WARN);ins[0].focus();return false}
     const vals=ins.slice(4).map(i=>num(i.value));
-    if(!(vals[0]>0)&&vals[0]!==0){hud("Enter the calories",WARN);return false}
-    if(basis==="serving"&&!(sv>0)){hud("Enter the serving size",WARN);return false}
+    if(!(vals[0]>0)&&vals[0]!==0){hud("Enter the calories",WARN);ins[4].focus();return false}
+    if(basis==="serving"&&!(sv>0)){hud("Enter the serving size",WARN);ins[3].focus();return false}
     const k=basis==="serving"?100/sv:1;
     const n=new Array(N.length).fill(null);
     LABEL_FIELDS.forEach(([,key,i],j)=>{
       const v=vals[j];if(v==null)return;
       n[i]=Math.round((key==="salt"?v*400:v)*k*10)/10;
     });
+    /* A barcode belongs to one food. The id is only derived from it while
+       that id is free, so another member's food, or its tombstone, is never
+       overwritten. */
+    const clash=bc&&Object.values(S.foods).find(x=>live(x)&&x.barcode===bc&&x.id!==f.id);
+    if(clash){hud(`That barcode is already ${clash.name}`,WARN);ins[2].focus();return false}
     const portions=(f.portions||[]).filter(p=>!/^1 serving/.test(p[0]));
     if(sv>0)portions.unshift([`1 serving (${fmtN(sv,1)} g)`,sv]);
-    const out=Object.assign({},f,{id:f.id||(bc?"b"+bc:uid()),name:nm,brand:br,barcode:bc||"",n,portions,
+    const out=Object.assign({},f,{id:f.id||(bc&&!S.foods["b"+bc]?"b"+bc:uid()),name:nm,brand:br,barcode:bc||"",n,portions,
       src:f.src||"user",mine:true,t:now()});
     delete out.del;
     S.foods[out.id]=out;dirtyFood(out.id);renderAll();
@@ -1884,26 +2166,31 @@ function openListEditor(kind,src){
   const r=src?JSON.parse(JSON.stringify(src)):{id:uid(),name:"",items:[]};
   if(isR){r.cooked=r.cooked||null;r.serv=r.serv||null}
   let nameIn,itemsCard,summary,cookedIn,servIn,rawEl;
-  const root=sheet({title:src?(isR?"Recipe":"Saved meal"):(isR?"New recipe":"New meal"),left:"Cancel",right:"Save",tall:true,
-    onRight:()=>save(),build:body=>{
+  const root=sheet({title:src?(isR?"Recipe":"Saved meal"):(isR?"New recipe":"New meal"),left:"Cancel",right:src?"Save":"Add",tall:true,
+    dirty:()=>snap()!==snap0,
+    onRight:()=>save(),build:(body,sh)=>{
     body.innerHTML=`<div class="card">${fieldRow("Name",{value:r.name,placeholder:isR?"e.g. Chilli con carne":"e.g. Usual breakfast",mode:""})}</div>
-      <div class="shdr"><span class="t">${isR?"Ingredients":"Items"}</span><span class="x" data-raw></span></div>
+      <div class="shdr"><h2 class="t">${isR?"Ingredients":"Items"}</h2><span class="x" data-raw></span></div>
       <div class="card" data-items></div>
-      ${isR?`<div class="shdr"><span class="t">Finished dish</span></div>
-      <div class="card">${fieldRow("Cooked weight",{value:r.cooked||"",unit:"g",placeholder:"optional"})}
-        ${fieldRow("Servings",{value:r.serv||"",placeholder:"optional"})}</div>
+      ${isR?`<div class="shdr"><h2 class="t">Finished dish</h2></div>
+      <div class="card">${fieldRow("Cooked weight",{value:r.cooked||"",unit:"g",placeholder:"Optional"})}
+        ${fieldRow("Servings",{value:r.serv||"",unit:"",placeholder:"Optional"})}</div>
       <p class="foot">Weigh the dish once it is cooked, without the pot. Cooking adds or loses water, so this is what makes a gram of the finished dish right. Left empty, the raw weight is used.</p>`:""}
       <div class="card" style="margin-top:22px" data-sum></div>`;
     nameIn=body.querySelector("input");
     itemsCard=body.querySelector("[data-items]");summary=body.querySelector("[data-sum]");rawEl=body.querySelector("[data-raw]");
     if(isR){const ins=body.querySelectorAll("input");cookedIn=ins[1];servIn=ins[2];
       [cookedIn,servIn].forEach(i=>i.addEventListener("input",()=>{r.cooked=num(cookedIn.value);r.serv=num(servIn.value);drawSum()}))}
-    selectOnFocus(body);
+    selectOnFocus(body);formKeys(body,sh.submit);
     if(src&&live(src)){
       const log=el("button","btn ghost",isR?"Log a portion":"Log this meal");
+      /* Edits are saved first, so what is logged is what is on screen. An
+         untouched one is not re-stamped: newest wins, and that would undo a
+         newer edit from the other phone. The library logs to today. */
+      const keep=()=>snap()===snap0||save(true)!==false;
       log.onclick=e=>{
-        if(isR){root.close();setTimeout(()=>openAmount(recipeItem(src),{mode:"log",meal:guessMeal(),k:cur,onDone:m=>hud(`Added to ${MEAL_NAME[m]}`)}),300);return}
-        menu(e.currentTarget,MEALS.map(([v,t])=>({label:`Add to ${t}`,onSelect:()=>{logMeal(src,cur,v);renderAll();hud(`Added to ${t}`)}})));
+        if(isR){if(!keep())return;root.close();setTimeout(()=>openAmount(recipeItem(store[r.id]),{mode:"log",meal:guessMeal(),k:todayKey(),onDone:m=>hud(`Added to ${MEAL_NAME[m]}`)}),300);return}
+        menu(e.currentTarget,MEALS.map(([v,t])=>({label:`Add to ${t}`,onSelect:()=>{if(!keep())return;root.close();logMeal(store[r.id],todayKey(),v);renderAll();hud(`Added to ${t}`)}})));
       };
       const del=el("button","btn danger",isR?"Delete recipe":"Delete meal");
       del.onclick=async()=>{
@@ -1914,13 +2201,17 @@ function openListEditor(kind,src){
     }
     draw();
   }});
+  /* Taken once the sheet is built, so an untouched recipe closes quietly. */
+  const snap=()=>JSON.stringify([nameIn.value.trim(),r.items,isR?num(cookedIn.value):0,isR?num(servIn.value):0]);
+  const snap0=snap();
   function draw(){
     itemsCard.innerHTML="";
     r.items.forEach((x,i)=>{
-      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(x.name)}</span><span class="fs">${esc(amountText(x))}</span></span><span class="fk">${kc(kcalOf(x))}</span>`);
+      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(x.name)}</span><span class="fs">${esc(amountText(x))}</span></span><span class="fk">${kc(kcalOf(x))}</span>${CHEV}`);
       b.type="button";
       itemsCard.appendChild(swipeRow(b,
-        ()=>openAmount(itemFromEntry(x),{mode:"pick",onDone:y=>{r.items[i]=Object.assign({id:x.id},y);draw()}}),
+        ()=>openAmount(itemFromEntry(x),{mode:"pick",right:"Done",focus:false,onDone:y=>{r.items[i]=Object.assign({id:x.id},y);draw()},
+          onRemove:()=>{r.items.splice(i,1);draw()}}),
         ()=>{r.items.splice(i,1);draw()}));
     });
     const add=el("button","cell addrow",`${PLUS}<span class="cl">${isR?"Add an ingredient":"Add an item"}</span>`);
@@ -1933,7 +2224,7 @@ function openListEditor(kind,src){
   function drawSum(){
     const raw=r.items.reduce((a,x)=>a+(x.g||0),0);
     rawEl.textContent=r.items.length?`${fmtN(raw)} g raw`:"";
-    if(cookedIn)cookedIn.placeholder=raw>0?`${fmtN(raw)} (raw)`:"optional";
+    if(cookedIn)cookedIn.placeholder=raw>0?`${fmtN(raw)} (raw)`:"Optional";
     const tot=totals(r.items).t;
     let rows=[["Calories",`${kc(tot[0])} kcal`],["Protein",`${g1(tot[NI.protein])} g`],["Carbs",`${g1(tot[NI.carbs])} g`],["Fat",`${g1(tot[NI.fat])} g`]];
     if(isR){
@@ -1943,12 +2234,13 @@ function openListEditor(kind,src){
     }
     summary.innerHTML=rows.map(([a,b])=>`<div class="cell"><span class="cl">${a}</span><span class="cv">${b}</span></div>`).join("");
   }
-  function save(){
+  /* quiet: saved on the way to logging, whose own HUD follows. */
+  function save(quiet){
     r.name=nameIn.value.trim();
-    if(!r.name){hud("Give it a name",WARN);return false}
+    if(!r.name){hud("Give it a name",WARN);nameIn.focus();return false}
     if(!r.items.length){hud(isR?"Add an ingredient":"Add an item",WARN);return false}
     if(isR){r.cooked=num(cookedIn.value)||null;r.serv=num(servIn.value)||null}
-    r.t=now();store[r.id]=r;dirtyMeta();renderAll();hud("Saved");
+    r.t=now();store[r.id]=r;dirtyMeta();renderAll();if(!quiet)hud("Saved");
   }
   return root;
 }
@@ -1977,7 +2269,7 @@ function macroCell(label,have,goal,c){
     `<div class="mv">${fmtN(Math.round(have))} <small>/ ${fmtN(goal)} g</small></div></div>`;
 }
 function renderDiary(){
-  $("dateLabel").textContent=fmt(cur,{weekday:"short",day:"numeric",month:"short"});
+  $("dateLabel").textContent=fmt(cur,{weekday:"short",day:"numeric",month:"short",...yearIf(cur)});
   $("nextDay").disabled=cur>=todayKey();
   const p=plan(cur)||{kcal:0,protein:0,carbs:0,fat:0};
   const tot=totals(entries(cur)).t;
@@ -1991,21 +2283,21 @@ function renderDiary(){
         <div class="mid"><b>${kc(Math.abs(left))}</b><span>${over?"kcal over":"kcal left"}</span></div></div>
       <div class="sum-r"><div class="kv"><span>Target</span><b>${kc(p.kcal)}</b></div>
         <div class="kv"><span>Eaten</span><b>${kc(eaten)}</b></div>
-        <div class="kv"><span>${over?"Over":"Left"}</span><b style="color:var(--${over?"red":"green"})">${kc(Math.abs(left))}</b></div></div></div>
+        <div class="kv"><span>${over?"Over":"Left"}</span><b style="color:var(--${over?"red-text":"green-text"})">${kc(Math.abs(left))}</b></div></div></div>
     <div class="macros">${macroCell("Protein",tot[NI.protein],p.protein,"pro")}${macroCell("Carbs",tot[NI.carbs],p.carbs,"carb")}${macroCell("Fat",tot[NI.fat],p.fat,"fat")}</div>`;
 
   const wrap=$("meals");wrap.innerHTML="";
   for(const [m,label] of MEALS){
     const list=entries(cur,m);
     const sum=list.reduce((a,e)=>a+kcalOf(e),0);
-    const h=el("div","shdr",`<span class="t">${label}</span>`);
+    const h=el("div","shdr",`<h2 class="t">${label}</h2>`);
     const more=el("button","x",`<span class="num">${list.length?kc(sum)+" kcal":""}</span>${DOTS}`);
-    more.type="button";more.setAttribute("aria-label",`${label} options`);
+    more.type="button";more.setAttribute("aria-label",`${label} options${list.length?`, ${kc(sum)} kcal`:""}`);
     more.onclick=()=>mealMenu(more,m,list);
     h.appendChild(more);
     const card=el("div","card");
     for(const e of list){
-      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(e.name)}</span><span class="fs">${esc(amountText(e))}</span></span><span class="fk">${kc(kcalOf(e))}</span>`);
+      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(e.name)}</span><span class="fs">${esc(amountText(e))}</span></span><span class="fk">${kc(kcalOf(e))}</span>${CHEV}`);
       b.type="button";
       card.appendChild(swipeRow(b,()=>editEntry(e),()=>{delEntry(cur,e.id);renderAll();hud("Deleted")}));
     }
@@ -2018,9 +2310,16 @@ function renderDiary(){
   $("weightVal").innerHTML=live(w)?`${fmtN(w.kg,1)} kg`:`<span class="tintc">Add</span>`;
   $("nutriVal").textContent=entries(cur).length?`${g1(tot[NI.fiber])} g fibre`:"";
 }
+/* A USDA entry tapped before the database has loaded would open on its logged
+   snapshot, with fewer units. Wait for it briefly, once, then open anyway. */
 function editEntry(e){
-  if(e.u==="quick")openQuickAdd({k:cur,entry:e});
-  else openAmount(itemFromEntry(e),{mode:"edit",entry:e,k:cur});
+  if(e.u==="quick")return openQuickAdd({k:cur,entry:e});
+  /* The day is taken now: the diary may move on while this waits. */
+  const k=cur,go=()=>openAmount(itemFromEntry(e),{mode:"edit",entry:e,k});
+  if(USDA||!/^u:/.test(e.ref||""))return go();
+  if(editEntry.wait)return;
+  editEntry.wait=1;
+  Promise.race([loadUSDA(),new Promise(r=>setTimeout(r,800))]).catch(()=>{}).then(()=>{editEntry.wait=0;go()});
 }
 function copyEntries(fromK,toK,m){
   const list=entries(fromK,m);const t=now();
@@ -2030,16 +2329,19 @@ function copyEntries(fromK,toK,m){
 function mealMenu(anchor,m,list){
   const y=shiftKey(cur,-1),yl=entries(y,m);
   const items=[];
-  if(yl.length)items.push({label:`Copy yesterday’s ${MEAL_NAME[m].toLowerCase()}`,detail:`${yl.length} item${yl.length===1?"":"s"} · ${kc(yl.reduce((a,e)=>a+kcalOf(e),0))} kcal`,
-    onSelect:()=>{copyEntries(y,cur,m);renderAll();hud("Copied")}});
-  items.push({label:"Copy from another day…",onSelect:async()=>{
-    const k=await pickDate({value:shiftKey(cur,-1),title:`Copy ${MEAL_NAME[m].toLowerCase()} from`});
-    if(!k)return;
+  /* "Yesterday" only when the day shown is today; otherwise name the day. */
+  if(yl.length)items.push({label:cur===todayKey()?`Copy yesterday’s ${MEAL_NAME[m].toLowerCase()}`:`Copy ${MEAL_NAME[m].toLowerCase()} from ${fmt(y,{weekday:"short",day:"numeric",month:"short",...yearIf(y)})}`,
+    detail:`${yl.length} item${yl.length===1?"":"s"} · ${kc(yl.reduce((a,e)=>a+kcalOf(e),0))} kcal`,
+    onSelect:()=>{const n=copyEntries(y,cur,m);renderAll();hud(`Copied ${n} item${n===1?"":"s"}`)}});
+  /* Short enough for the 136px sheet title at 320; the menu item matches it. */
+  items.push({label:"Copy from a day…",onSelect:async()=>{
+    const k=await pickDate({value:shiftKey(cur,-1),max:shiftKey(cur,-1),right:"",title:"Copy from a day"});
+    if(!k||k===cur)return;
     const n=copyEntries(k,cur,m);renderAll();
     hud(n?`Copied ${n} item${n===1?"":"s"}`:"Nothing logged then",n?undefined:WARN);
   }});
   if(list.length)items.push({label:"Save as a meal",onSelect:async()=>{
-    const name=await promptText({title:"Name this meal",placeholder:`e.g. Usual ${MEAL_NAME[m].toLowerCase()}`,right:"Save",
+    const name=await promptText({title:"Save as a meal",placeholder:`e.g. Usual ${MEAL_NAME[m].toLowerCase()}`,right:"Save",
       note:"Saved meals appear when you add food, and log in one tap."});
     if(!name)return;
     const id=uid();
@@ -2052,32 +2354,37 @@ function mealMenu(anchor,m,list){
   }});
   menu(anchor,items);
 }
-function openWeight(k){
+/* o.focus raises the keyboard even over an existing weigh-in (Log weight). */
+function openWeight(k,o={}){
   const d=S.days[k],w=d&&d.w;const has=live(w);
-  const root=sheet({title:"Weight",left:"Cancel",right:"Save",onRight:()=>{
-    const v=num(root.body.querySelector("input").value);
-    if(!(v>=25&&v<=400)){hud("Enter a weight in kg",WARN);return false}
+  const root=sheet({title:"Weight",left:"Cancel",right:has?"Save":"Add",onRight:()=>{
+    const inp=root.body.querySelector("input"),v=num(inp.value);
+    if(!(v>=25&&v<=400)){hud("Enter a weight in kg",WARN);inp.focus();return false}
     setWeight(k,v);renderAll();hud("Saved");
-  },build:body=>{
-    body.innerHTML=`<div class="card">${fieldRow(fmt(k,{weekday:"long",day:"numeric",month:"long"}),{value:has?w.kg:(weightOn(k)||""),unit:"kg"})}</div>
+  },build:(body,sh)=>{
+    body.innerHTML=`<div class="card">${fieldRow(fmt(k,{weekday:"short",day:"numeric",month:"short",...yearIf(k)}),{value:has?w.kg:(weightOn(k)||""),unit:"kg"})}</div>
       <p class="foot">Weigh yourself in the morning, after the toilet and before eating, a few times a week. The trend matters, not any one day — water alone moves it a kilo or two.</p>`;
     if(has){
       const del=el("button","btn danger","Delete this weigh-in");
-      del.onclick=()=>{setWeight(k,0);root.close();renderAll();hud("Deleted")};
+      del.onclick=async()=>{
+        if(!await confirmBox("Delete this weigh-in?",`${fmtN(w.kg,1)} kg on ${fmt(k,{day:"numeric",month:"long",...yearIf(k)})}`))return;
+        setWeight(k,0);root.close();renderAll();hud("Deleted");
+      };
       body.appendChild(del);
     }
-    selectOnFocus(body);
+    selectOnFocus(body);formKeys(body,sh.submit);
   }});
-  setTimeout(()=>root.body.querySelector("input").focus(),120);
+  /* Only a new weigh-in takes focus; the keyboard would cover Delete. */
+  if(!has||o.focus)setTimeout(()=>root.body.querySelector("input").focus(),120);
 }
 function openNutrition(k){
   const list=entries(k);const tt=totals(list);const p=plan(k)||{};
-  sheet({title:"Nutrition",left:"Close",tall:true,build:body=>{
+  sheet({title:"Nutrition",left:"",right:"Done",tall:true,build:body=>{
     if(!list.length){body.appendChild(el("p","foot","Nothing logged on this day yet."));return}
     const macro=[["Calories",tt.t[0],p.kcal,"kcal"],["Protein",tt.t[NI.protein],p.protein,"g"],["Carbs",tt.t[NI.carbs],p.carbs,"g"],["Fat",tt.t[NI.fat],p.fat,"g"]];
-    body.innerHTML=`<div class="fd-src" style="margin-top:2px">${esc(fmt(k,{weekday:"long",day:"numeric",month:"long"}))}</div>
+    body.innerHTML=`<div class="fd-src" style="margin-top:2px">${esc(fmt(k,{weekday:"long",day:"numeric",month:"long",...yearIf(k)}))}</div>
       <div class="card">${macro.map(([l,v,g,u])=>`<div class="cell"><span class="cl">${l}</span><span class="cv">${u==="kcal"?kc(v):g1(v)} / ${fmtN(g)} ${u}</span></div>`).join("")}</div>
-      <div class="shdr"><span class="t">Vitamins and minerals</span><span class="x">% of daily value</span></div>`;
+      <div class="shdr"><h2 class="t">Vitamins and minerals</h2><span class="x">% of daily value</span></div>`;
     const card=el("div","card");
     for(const key of Object.keys(NLABEL)){
       const i=NI[key],v=tt.t[i],cov=tt.cov[i],dv=DV[key];
@@ -2111,7 +2418,7 @@ function renderFoods(){
     for(const f of foods.slice(0,300)){
       const b=el("button","fr",`<span class="ft"><span class="fn">${esc(f.name)}</span><span class="fs">`+
         `<span class="tag${f.mine?" me":""}">${f.mine?"YOU":"GROUP"}</span>${esc([f.brand,f.barcode?"barcode":""].filter(Boolean).join(" · "))}</span></span>`+
-        `<span class="fk">${kc(f.n&&f.n[0])}<small>per 100 g</small></span>`);
+        `<span class="fk">${kc(f.n&&f.n[0])}<small>per 100 g</small></span>${CHEV}`);
       b.type="button";b.onclick=()=>openFoodEditor(f);
       list.appendChild(b);
     }
@@ -2127,7 +2434,7 @@ function renderFoods(){
       if(isR){const info=recipeInfo(x);sub=`${x.items.length} ingredient${x.items.length===1?"":"s"}`+(x.serv?` · ${fmtN(x.serv)} servings`:"");
         right=info.serving?kc(info.total/x.serv):kc(info.per100[0]);small=info.serving?"per serving":"per 100 g"}
       else{sub=x.items.map(i=>i.name.split(",")[0]).join(", ");right=kc(x.items.reduce((a,i)=>a+kcalOf(i),0));small="kcal"}
-      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(x.name)}</span><span class="fs">${esc(sub)}</span></span><span class="fk">${right}<small>${small}</small></span>`);
+      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(x.name)}</span><span class="fs">${esc(sub)}</span></span><span class="fk">${right}<small>${small}</small></span>${CHEV}`);
       b.type="button";b.onclick=()=>isR?openRecipe(x):openMeal(x);
       list.appendChild(b);
     }
@@ -2138,7 +2445,9 @@ function renderFoods(){
   if(!count)list.appendChild(el("p","empty",q?"Nothing matches.":libTab==="foods"?"No foods yet.":libTab==="recipes"?"No recipes yet.":"No saved meals yet."));
 }
 $("libSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;haptic();libTab=b.dataset.v;renderFoods()});
-$("libSearch").addEventListener("input",renderFoods);
+$("libSearch").addEventListener("input",()=>{$("libClear").classList.toggle("hidden",!$("libSearch").value);renderFoods()});
+$("libClear").addEventListener("click",()=>{$("libSearch").value="";$("libClear").classList.add("hidden");$("libSearch").focus();renderFoods()});
+$("libSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();e.target.blur()}});
 $("libNew").addEventListener("click",()=>{
   if(libTab==="foods")openFoodEditor(null,{});
   else if(libTab==="recipes")openRecipe(null);
@@ -2155,11 +2464,12 @@ function weighIns(){
 /* A moving average over weigh-ins, so one salty dinner does not read as a
    kilo gained. Each weigh-in moves the trend a quarter of the way to it. */
 function trendOf(ws){let t=null;return ws.map(w=>{t=t==null?w.kg:t+.25*(w.kg-t);return Object.assign({},w,{t})})}
-function chartSVG({W=340,H=170,xs,ymin,ymax,ylabels,body}){
+/* label names the chart for VoiceOver, which otherwise reads only "image". */
+function chartSVG({W=340,H=170,xs,ymin,ymax,ylabels,body,label}){
   const L=34,Rr=6,T=8,B=20;
   const x=i=>L+(xs<=1?0:i/(xs-1))*(W-L-Rr);
   const y=v=>T+(1-(v-ymin)/(ymax-ymin||1))*(H-T-B);
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img"${label?` aria-label="${esc(label)}"`:""}>`;
   for(const v of ylabels)s+=`<line class="gl" x1="${L}" x2="${W-Rr}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="ax" x="${L-6}" y="${(y(v)+4).toFixed(1)}" text-anchor="end">${fmtN(v,1)}</text>`;
   s+=body(x,y,{L,R:W-Rr,T,B:H-B,W,H})+"</svg>";
   return s;
@@ -2172,6 +2482,8 @@ function renderProgress(){
   const all=trendOf(weighIns());
   const ws=all.filter(w=>w.k>=start);
   const wc=$("weightCard");
+  /* Drawn at the card's own width, so the 11px axis labels stay 11px. */
+  const CW=Math.max(240,(wc.clientWidth||364)-24);
   if(!ws.length){
     wc.innerHTML=`<p class="empty">No weigh-ins in this period. Log your weight a few times a week and the trend shows here — it is what tells you whether the calorie target is right for you.</p>`;
   }else{
@@ -2181,11 +2493,13 @@ function renderProgress(){
     const st=niceStep(hi-lo);lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;
     const yl=[];for(let v=lo;v<=hi+1e-9;v+=st)yl.push(Math.round(v*10)/10);
     const first=ws[0],last=ws[ws.length-1],ch=last.t-first.t;
-    wc.innerHTML=`<div class="chart-cap"><b>${fmtN(last.t,1)} kg</b><span>${ws.length>1?`${ch>0?"+":ch<0?"−":"±"}${fmtN(Math.abs(ch),1)} kg trend since ${esc(fmt(first.k,{day:"numeric",month:"short"}))}`:"trend"}</span></div>
-      <div class="chart">${chartSVG({xs,ymin:lo,ymax:hi,ylabels:yl,body:(x,y,b)=>{
+    wc.innerHTML=`<div class="chart-cap"><b>${fmtN(last.t,1)} kg</b><span>${ws.length>1?`${ch>0?"+":ch<0?"−":"±"}${fmtN(Math.abs(ch),1)} kg trend since ${esc(fmt(first.k,{day:"numeric",month:"short",...yearIf(first.k)}))}`:"trend"}</span></div>
+      <div class="chart">${chartSVG({W:CW,xs,ymin:lo,ymax:hi,ylabels:yl,
+        label:ws.length>1?`Weight trend ${fmtN(last.t,1)} kg, ${ch>=.05?"up "+fmtN(ch,1)+" kg":ch<=-.05?"down "+fmtN(-ch,1)+" kg":"unchanged"} since ${fmt(first.k,{day:"numeric",month:"short",...yearIf(first.k)})}`:`One weigh-in, ${fmtN(last.kg,1)} kg`,
+        body:(x,y,b)=>{
         let s=ws.map(w=>`<circle class="pt" cx="${x(idx(w.k)).toFixed(1)}" cy="${y(w.kg).toFixed(1)}" r="2.6"/>`).join("");
         if(ws.length>1)s=`<polyline class="tl" points="${ws.map(w=>`${x(idx(w.k)).toFixed(1)},${y(w.t).toFixed(1)}`).join(" ")}"/>`+s;
-        s+=`<text class="ax" x="${b.L}" y="${b.H-4}">${esc(fmt(start,{day:"numeric",month:"short"}))}</text><text class="ax" x="${b.R}" y="${b.H-4}" text-anchor="end">Today</text>`;
+        s+=`<text class="ax" x="${b.L}" y="${b.H-4}">${esc(fmt(start,{day:"numeric",month:"short",...yearIf(start)}))}</text><text class="ax" x="${b.R}" y="${b.H-4}" text-anchor="end">Today</text>`;
         return s;
       }})}</div>
       <div class="legend"><span><i style="background:var(--tint)"></i>Trend</span><span><i style="background:none;box-shadow:inset 0 0 0 1.6px var(--tint);border-radius:50%"></i>Weigh-in</span></div>`;
@@ -2207,14 +2521,18 @@ function renderProgress(){
     const hi=Math.max(target,...bars.map(b=>b.kcal||0))*1.08;
     const st=niceStep(hi);const yl=[];for(let v=0;v<=hi;v+=st)yl.push(v);
     const avg=done.length?done.reduce((a,d)=>a+d.kcal,0)/done.length:null;
+    /* Counted over days, not weekly bars, so it matches the day count. */
+    const over=done.filter(d=>target&&d.kcal>target*1.05).length;
     kcCard.innerHTML=`<div class="chart-cap"><b>${avg==null?"–":kc(avg)+" kcal"}</b><span>${done.length?`a day, over ${done.length} logged day${done.length===1?"":"s"} before today`:"no full days logged yet"}${target?` · target ${kc(target)}`:""}</span></div>
-      <div class="chart">${chartSVG({xs:bars.length,ymin:0,ymax:Math.max(st*yl.length,hi),ylabels:yl,body:(x,y,b)=>{
+      <div class="chart">${chartSVG({W:CW,xs:bars.length,ymin:0,ymax:Math.max(yl[yl.length-1],hi),ylabels:yl,
+        label:`${done.length} logged day${done.length===1?"":"s"} before today${target?`, ${over} over target by 5% or more`:""}`,
+        body:(x,y,b)=>{
         const bw=Math.max(2,(b.R-b.L)/bars.length*.62);
         let s=bars.map((d,i)=>d.kcal==null?"":`<rect class="bq${target&&d.kcal>target*1.05?" o":""}" x="${(x(i)-bw/2).toFixed(1)}" y="${y(d.kcal).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,y(0)-y(d.kcal)).toFixed(1)}" rx="${Math.min(2,bw/2)}"/>`).join("");
         if(target)s+=`<line class="tg" x1="${b.L}" x2="${b.R}" y1="${y(target).toFixed(1)}" y2="${y(target).toFixed(1)}"/>`;
         return s;
       }})}</div>
-      <div class="legend"><span><i style="background:var(--green)"></i>On target</span><span><i style="background:var(--orange)"></i>Over by 5%+</span>${weekly?"<span>Weekly averages</span>":""}</div>`;
+      <div class="legend"><span><i style="background:var(--green)"></i>On target</span><span><i style="background:var(--red)"></i>Over by 5%+</span>${weekly?"<span>Weekly averages</span>":""}</div>`;
   }
 
   const pAvg=done.length?done.reduce((a,d)=>a+d.p,0)/done.length:null;
@@ -2222,20 +2540,20 @@ function renderProgress(){
     ["Average protein",pAvg==null?"–":`${fmtN(Math.round(pAvg))}<small> g</small>`,p?`target ${fmtN(p.protein)} g`:""],
     ["Days logged",`${logged.length}<small> / ${range}</small>`,"days with any food"],
     ["Estimated burn",p?`${kc(p.tdee)}<small> kcal</small>`:"–","from your profile"],
-    ["Weigh-ins",String(ws.length),ws.length?`last ${esc(fmt(ws[ws.length-1].k,{day:"numeric",month:"short"}))}`:"none in this period"]];
+    ["Weigh-ins",String(ws.length),ws.length?`last ${esc(fmt(ws[ws.length-1].k,{day:"numeric",month:"short",...yearIf(ws[ws.length-1].k)}))}`:"none in this period"]];
   $("progTiles").innerHTML=tiles.map(([a,b,c])=>`<div class="tile"><span>${a}</span><b>${b}</b><small class="s">${c}</small></div>`).join("");
 
   const wl=$("weighins");wl.innerHTML="";
   const recent=weighIns().reverse().slice(0,12);
   for(const w of recent){
-    const b=el("button","cell",`<span class="cl">${esc(fmt(w.k,{weekday:"short",day:"numeric",month:"short",year:w.k.slice(0,4)===end.slice(0,4)?undefined:"numeric"}))}</span><span class="cv">${fmtN(w.kg,1)} kg</span>`);
+    const b=el("button","cell",`<span class="cl">${esc(fmt(w.k,{weekday:"short",day:"numeric",month:"short",...yearIf(w.k)}))}</span><span class="cv">${fmtN(w.kg,1)} kg</span>${CHEV}`);
     b.type="button";
     wl.appendChild(swipeRow(b,()=>openWeight(w.k),()=>{setWeight(w.k,0);renderAll();hud("Deleted")}));
   }
   if(!recent.length)wl.appendChild(el("p","empty","None yet."));
 }
 $("rangeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;haptic();range=+b.dataset.r;renderProgress()});
-$("logWeight").addEventListener("click",()=>openWeight(todayKey()));
+$("logWeight").addEventListener("click",()=>openWeight(todayKey(),{focus:true}));
 
 /* ==========================================================================
    Profile form — first run and the Me tab
@@ -2246,16 +2564,16 @@ function profileForm(init){
   const p=init.profile||{},g=init.goal||{type:"maintain",pace:"slow"};
   const d={sex:p.sex||null,age:p.by?new Date().getFullYear()-p.by:null,cm:p.cm||null,kg:init.kg||p.kg||null,act:p.act||1.375,type:g.type,pace:g.pace||"slow"};
   const node=el("div");
-  node.innerHTML=`<div class="shdr"><span class="t">About you</span></div>
+  node.innerHTML=`<div class="shdr"><h2 class="t">About you</h2></div>
     <div class="card">
       <div class="cell"><span class="cl" style="flex:none">Sex</span><div style="flex:1" data-sex></div></div>
-      ${fieldRow("Age",{value:d.age||"",unit:"years",mode:"numeric",placeholder:"30"})}
-      ${fieldRow("Height",{value:d.cm||"",unit:"cm",placeholder:"175"})}
-      ${fieldRow("Weight",{value:d.kg||"",unit:"kg",placeholder:"75"})}
+      ${fieldRow("Age",{value:d.age||"",unit:"years",mode:"numeric",placeholder:"Required"})}
+      ${fieldRow("Height",{value:d.cm||"",unit:"cm",placeholder:"Required"})}
+      ${fieldRow("Weight",{value:d.kg||"",unit:"kg",placeholder:"Required"})}
       <button class="cell" type="button" data-act><span class="cl" style="flex:none">Activity</span><span class="cv" style="flex:1"></span><span class="tintc">${UPDOWN}</span></button>
     </div>
     <p class="foot" data-actdesc></p>
-    <div class="shdr"><span class="t">Goal</span></div>
+    <div class="shdr"><h2 class="t">Goal</h2></div>
     <div class="card"><div class="segwrap" data-goal></div><div class="segwrap" data-pace style="padding-top:0"></div></div>
     <p class="foot" data-pacedesc></p>
     <div class="result" data-result></div>
@@ -2270,6 +2588,13 @@ function profileForm(init){
   selectOnFocus(node);
   node.querySelector("[data-act]").onclick=e=>menu(e.currentTarget,ACT.map(([v,label,desc])=>({label,detail:desc,selected:v===d.act,onSelect:()=>{d.act=v;upd()}})));
   function valid(){return !!(d.sex&&d.age>=13&&d.age<=100&&d.cm>=120&&d.cm<=230&&d.kg>=30&&d.kg<=300)}
+  /* The action stays disabled until valid, so the note has to say why. */
+  function problem(){
+    if(d.age!=null&&!(d.age>=13&&d.age<=100))return "Age must be between 13 and 100.";
+    if(d.cm!=null&&!(d.cm>=120&&d.cm<=230))return "Height must be between 120 and 230 cm.";
+    if(d.kg!=null&&!(d.kg>=30&&d.kg<=300))return "Weight must be between 30 and 300 kg.";
+    return null;
+  }
   function value(){return{profile:{sex:d.sex,by:new Date().getFullYear()-Math.round(d.age),cm:d.cm,kg:d.kg,act:d.act},goal:{type:d.type,pace:d.pace}}}
   function upd(){
     const a=ACT.find(x=>x[0]===d.act)||ACT[1];
@@ -2278,13 +2603,13 @@ function profileForm(init){
     node.querySelector("[data-pace]").classList.toggle("hidden",d.type==="maintain");
     const res=node.querySelector("[data-result]"),note=node.querySelector("[data-note]"),pd=node.querySelector("[data-pacedesc]");
     if(!valid()){
-      res.innerHTML="";note.textContent="Fill in your sex, age, height and weight to see your numbers.";
+      res.innerHTML="";note.textContent=problem()||"Fill in your sex, age, height and weight to see your numbers.";
       pd.textContent="";if(node.onValid)node.onValid(false);return;
     }
     const v=value();const pl=plan(null,v);
     const r=RATE[d.type][d.pace];
     pd.textContent=d.type==="maintain"?"Eat what you burn. Good for building muscle slowly while staying lean.":
-      `Aims to ${d.type==="lose"?"lose":"gain"} ${fmtN(Math.abs(r)*100,2)}% of your weight a week — about ${fmtN(Math.abs(r)*d.kg,2)} kg.`+
+      `Aims to ${d.type==="lose"?"lose":"gain"} ${fmtN(Math.abs(r)*100,2)}% of your weight a week — about ${fmtN(Math.abs(r)*d.kg,2)} kg.`+
       (d.type==="gain"?" Gaining faster than this mostly adds fat.":"");
     res.innerHTML=`<div class="tile"><span>You burn about</span><b>${kc(pl.tdee)}<small> kcal</small></b><small class="s">${kc(pl.bmr)} at rest</small></div>
       <div class="tile"><span>Eat</span><b>${kc(pl.kcal)}<small> kcal</small></b><small class="s">a day</small></div>`;
@@ -2294,7 +2619,7 @@ function profileForm(init){
       " It is an estimate — your weight trend over the first few weeks shows the truth.";
     if(node.onValid)node.onValid(true);
   }
-  node.valid=valid;node.value=value;node.refresh=upd;
+  node.valid=valid;node.value=value;node.refresh=upd;node.problem=problem;
   return node;
 }
 function saveProfile(v){
@@ -2307,32 +2632,36 @@ function saveProfile(v){
   dirtyMeta();
 }
 function openProfileSheet(){
-  let form;
-  const root=sheet({title:"Profile and goal",left:"Cancel",right:"Save",tall:true,onRight:()=>{
-    if(!form.valid()){hud("Fill in every field",WARN);return false}
+  let form,snap0;
+  const root=sheet({title:"Profile and goal",left:"Cancel",right:"Save",tall:true,
+    dirty:()=>JSON.stringify(form.value())!==snap0,onRight:()=>{
+    if(!form.valid()){hud(form.problem()||"Fill in every field",WARN);return false}
     saveProfile(form.value());renderAll();hud("Saved");
-  },build:body=>{
+  },build:(body,sh)=>{
     form=profileForm({profile:S.meta.profile,goal:S.meta.goal,kg:weightOn(todayKey())});
+    form.onValid=ok=>sh.setRight("Save",ok);
     body.appendChild(form);
+    formKeys(form,sh.submit);
   }});
   paintIn(root);form.refresh();
+  snap0=JSON.stringify(form.value());
 }
 function openTargetsSheet(){
   const c=S.meta.custom||{};const p=plan(todayKey());
   const root=sheet({title:"Adjust targets",left:"Cancel",right:"Save",onRight:()=>{
     const ins=root.body.querySelectorAll("input");
     const k=num(ins[0].value),pr=num(ins[1].value);
-    if(k!=null&&!(k>=800&&k<=6000)){hud("Calories between 800 and 6,000",WARN);return false}
-    if(pr!=null&&!(pr>=20&&pr<=400)){hud("Protein between 20 and 400 g",WARN);return false}
+    if(k!=null&&!(k>=800&&k<=6000)){hud("Calories between 800 and 6,000",WARN);ins[0].focus();return false}
+    if(pr!=null&&!(pr>=20&&pr<=400)){hud("Protein between 20 and 400 g",WARN);ins[1].focus();return false}
     S.meta.custom={kcal:k||null,protein:pr||null,t:now()};dirtyMeta();renderAll();hud("Saved");
-  },build:body=>{
+  },build:(body,sh)=>{
     body.innerHTML=`<div class="card">${fieldRow("Calories",{value:c.kcal||"",unit:"kcal",mode:"numeric",placeholder:p?fmtN(plan(todayKey(),null,{noCustom:true}).kcal):""})}
       ${fieldRow("Protein",{value:c.protein||"",unit:"g",mode:"numeric",placeholder:p?String(plan(todayKey(),null,{noCustom:true}).protein):""})}</div>
       <p class="foot">Leave a field empty to use the recommended value. Fat is then set to 30% of calories and carbs fill the rest. Changing your goal keeps a custom calorie target until you clear it here.</p>`;
     const reset=el("button","btn ghost","Use recommended targets");
     reset.onclick=()=>{S.meta.custom={kcal:null,protein:null,t:now()};dirtyMeta();root.close();renderAll();hud("Reset")};
     if(c.kcal||c.protein)body.appendChild(reset);
-    selectOnFocus(body);
+    selectOnFocus(body);formKeys(body,sh.submit);
   }});
 }
 
@@ -2344,6 +2673,8 @@ function applyTheme(){
   const t=S.meta.theme||"auto";
   if(t==="auto")delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme=t;
+  /* The browser chrome follows theme-color, which only knows the system theme. */
+  document.querySelectorAll("meta[name=theme-color]").forEach(m=>{if(!m.dataset.media)m.dataset.media=m.media;m.media=t==="auto"?m.dataset.media:((m.content==="#000000")===(t==="dark")?"all":"not all")});
 }
 const BACKUP_DUE_DAYS=30;
 function daysSinceBackup(){return S.meta.backedUp?daysBetween(S.meta.backedUp,todayKey()):null}
@@ -2435,32 +2766,45 @@ const fmtBytes=b=>b==null?"Unknown":b<1024?b+" bytes":b<1048576?(b/1024).toFixed
 async function openDataSheet(){
   let persisted=null;
   try{if(navigator.storage&&navigator.storage.persisted)persisted=await navigator.storage.persisted()}catch(e){}
-  let bytes=null;try{const raw=localStorage.getItem(LS);bytes=raw?new Blob([raw]).size:0}catch(e){}
-  const last=S.sync.last?Math.round((Date.now()-new Date(S.sync.last))/60000):null;
-  const pending=Object.keys(S.sync.dd).length+Object.keys(S.sync.df).length+(S.sync.dm?1:0);
-  sheet({title:"Data and sync",left:"Close",tall:true,build:(body,root)=>{
-    const rows=[
-      ["Server copy",!S.key?"Not joined":lastSyncOk===false?"Offline":"On"],
-      ["Last synced",last===null?"Never":last<1?"Just now":last<60?`${last} min ago`:last<1440?`${Math.round(last/60)} h ago`:`${Math.round(last/1440)} days ago`],
-      ["Waiting to sync",pending?String(pending):"Nothing"],
-      ["Kept on this phone",persisted===true?"Protected":persisted===false?"Best effort":"Unknown"],
-      ["Opened from home screen",isInstalled()?"Yes":"No"],
-      ["Size of your data",fmtBytes(bytes)],
-      ["Last backup",ago(daysSinceBackup())]];
+  sheet({title:"Data and sync",left:"",right:"Done",tall:true,build:(body,root)=>{
+    /* Read afresh each time, so Sync now can redraw the rows in place. */
+    const rowsHtml=()=>{
+      let bytes=null;try{const raw=localStorage.getItem(LS);bytes=raw?new Blob([raw]).size:0}catch(e){}
+      const last=S.sync.last?Math.round((Date.now()-new Date(S.sync.last))/60000):null;
+      const pending=Object.keys(S.sync.dd).length+Object.keys(S.sync.df).length+(S.sync.dm?1:0);
+      const rows=[
+        ["Server copy",!S.key?"Not joined":lastSyncOk===false?"Offline":"On"],
+        ["Last synced",last===null?"Never":last<1?"Just now":last<60?`${last} min ago`:last<1440?`${Math.round(last/60)} h ago`:`${Math.round(last/1440)} days ago`],
+        ["Waiting to sync",pending?String(pending):"Nothing"],
+        ["Kept on this phone",persisted===true?"Protected":persisted===false?"Best effort":"Unknown"],
+        ["Opened from home screen",isInstalled()?"Yes":"No"],
+        ["Size of your data",fmtBytes(bytes)],
+        ["Last backup",ago(daysSinceBackup())]];
+      return rows.map(([k,v])=>`<div class="cell"><span class="cl">${esc(k)}</span><span class="cv">${esc(v)}</span></div>`).join("");
+    };
     const card=el("div","card");
-    card.innerHTML=rows.map(([k,v])=>`<div class="cell"><span class="cl">${esc(k)}</span><span class="cv">${esc(v)}</span></div>`).join("");
+    card.innerHTML=rowsHtml();
     body.appendChild(card);
     if(isIOS()&&!isInstalled())body.appendChild(el("div","note",
       "<b>This is open in a browser tab, not the installed app.</b> On iPhone a tab’s storage can be cleared after about a week without a visit. "+
       "Open this page in <b>Safari</b>, tap Share, then <b>Add to Home Screen</b>, and use the icon. Your synced data follows."));
     const sync=el("button","btn","Sync now");
-    sync.onclick=async()=>{sync.disabled=true;sync.textContent="Syncing…";const ok=await syncNow();root.close();hud(ok?"Synced":"Could not reach the server",ok?undefined:WARN)};
+    let leave=null;
+    /* The sheet stays open and its rows update. Only an unknown key, which
+       has just put up the invite screen, closes it. */
+    sync.onclick=async()=>{
+      sync.disabled=true;if(leave)leave.disabled=true;sync.textContent="Syncing…";
+      const ok=await syncNow();
+      if(!S.key)root.close();
+      else{sync.disabled=false;if(leave)leave.disabled=false;sync.textContent="Sync now";card.innerHTML=rowsHtml();renderAll()}
+      hud(ok?"Synced":"Could not reach the server",ok?undefined:WARN);
+    };
     if(S.key)body.appendChild(sync);
     const ex=el("button","btn ghost","Export backup");ex.onclick=()=>{exportBackup();root.close()};
     const im=el("button","btn ghost","Restore from a file");im.onclick=()=>{importBackup();root.close()};
     body.append(ex,im);
     if(S.key){
-      body.appendChild(el("div","shdr",'<span class="t">Your key</span>'));
+      body.appendChild(el("div","shdr",'<h2 class="t">Your key</h2>'));
       const kc_=el("div","card",`<div class="cell block"><code class="keyline">${esc(S.key)}</code></div>`);
       body.appendChild(kc_);
       body.appendChild(el("p","foot","This key is your account: there is no email or password. Paste it on a new phone to bring everything across. It is also inside every backup file. Anyone who has it can read and change your diary, and if it is lost along with every phone and backup, the synced copy cannot be recovered."));
@@ -2469,11 +2813,13 @@ async function openDataSheet(){
         if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(S.key).then(()=>hud("Copied"),()=>hud("Select it and copy",WARN));
         else hud("Select it and copy",WARN);
       };
-      const leave=el("button","btn danger","Delete my data from the server");
+      leave=el("button","btn danger","Delete my data from the server");
       leave.onclick=async()=>{
-        if(!await confirmBox("Delete your server copy?","Your diary is removed from the server and your place in the group is freed. It stays on this phone, so export a backup first if you want to keep it.","Delete"))return;
-        try{await rpc("cal_leave",{p_key:S.key})}catch(e){return tellUser("Could not delete",friendly(e))}
-        S.key=null;S.sync=syncBlank();saveLocal();root.close();setSync(null);showGate();
+        if(!await confirmBox("Delete your server copy?","Your diary is removed from the server and your place in the group is freed. This phone keeps its copy, but the app stays locked until you join again with an invite code, so export a backup first.","Delete"))return;
+        leave.disabled=sync.disabled=true;leave.textContent="Deleting…";
+        try{await rpc("cal_leave",{p_key:S.key})}
+        catch(e){leave.disabled=sync.disabled=false;leave.textContent="Delete my data from the server";return tellUser("Could not delete",friendly(e))}
+        S.key=null;S.sync=syncBlank();saveLocal();root.close();setSync(null);showGate();hud("Server copy deleted");
       };
       body.append(copy,leave);
     }
@@ -2498,35 +2844,40 @@ function renderGate(){
   if(!S.key){
     g.innerHTML=`<div class="hero"><div class="logo">${LOGO}</div><h1>Calories</h1>
       <p>Log what you eat against a daily target worked out for your body and your goal.</p></div>
-      <div class="shdr"><span class="t">Invite code</span></div>
-      <div class="card"><div class="cell"><input class="cin left" id="inviteIn" placeholder="Enter your invite code" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="go" aria-label="Invite code"></div></div>
+      <div class="shdr"><h2 class="t">Invite code</h2></div>
+      <div class="card"><label class="cell"><input class="cin left" id="inviteIn" placeholder="Enter your invite code" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" aria-label="Invite code"></label></div>
       <p class="foot err hidden" id="joinErr"></p>
       <button class="btn" id="joinBtn" type="button">Join</button>
       <button class="btn link" id="haveKey" type="button">Already joined on another phone?</button>
       <button class="btn link" id="restoreBk" type="button" style="margin-top:0">Restore from a backup file</button>`;
-    const inp=$("inviteIn"),btn=$("joinBtn"),err=$("joinErr");
+    const inp=$("inviteIn"),btn=$("joinBtn"),err=$("joinErr"),hk=$("haveKey"),rb=$("restoreBk");
+    /* While a request is out, nothing else here can start one. */
+    const busy=on=>[btn,inp,hk,rb].forEach(n=>n.disabled=on);
     const go=async()=>{
       const code=inp.value.trim();
-      if(!code){inp.focus();return}
-      btn.disabled=true;btn.textContent="Joining…";err.classList.add("hidden");
+      if(!code){hud("Enter your invite code",WARN);inp.focus();return}
+      busy(true);btn.textContent="Joining…";err.classList.add("hidden");
       try{await join(code);haptic(20);if(needsGate())renderGate();else{hideGate();hud("Welcome back")}}
-      catch(e){err.textContent=friendly(e);err.classList.remove("hidden");btn.disabled=false;btn.textContent="Join"}
+      catch(e){err.textContent=friendly(e);err.classList.remove("hidden");busy(false);btn.textContent="Join";announce(err.textContent);inp.focus()}
     };
     btn.onclick=go;
-    inp.addEventListener("keydown",e=>{if(e.key==="Enter")go()});
-    $("haveKey").onclick=async()=>{
+    /* The error is about the code that was sent, not the one being typed. */
+    inp.addEventListener("input",()=>err.classList.add("hidden"));
+    formKeys(g,go);
+    hk.onclick=async()=>{
       const v=await promptText({title:"Your key",placeholder:"40 characters",right:"Use it",
         note:"Find it on your other phone under Me → Data and sync. Anything already on this phone is merged in.",
         check:x=>/^[0-9a-f]{40}$/i.test(x.trim())||"That is not a key"});
       if(!v)return;
+      busy(true);hk.textContent="Checking the key…";err.classList.add("hidden");
       try{await useKey(v.trim().toLowerCase());if(needsGate())renderGate();else{hideGate();hud("Welcome back")}}
-      catch(e){tellUser("Could not use that key",friendly(e))}
+      catch(e){busy(false);hk.textContent="Already joined on another phone?";tellUser("Could not use that key",friendly(e))}
     };
-    $("restoreBk").onclick=importBackup;
+    rb.onclick=importBackup;
     return;
   }
   const form=profileForm({profile:S.meta.profile,goal:S.meta.goal,kg:weightOn(todayKey())});
-  g.innerHTML=`<h2 class="gh">About you</h2><p class="gp">This works out what you burn and how much to eat for your goal. You can change any of it later.</p>`;
+  g.innerHTML=`<h2 class="gh">Profile and goal</h2><p class="gp">This works out what you burn and how much to eat for your goal. You can change any of it later.</p>`;
   g.appendChild(form);
   const start=el("button","btn","Start");start.type="button";start.disabled=true;
   form.onValid=ok=>{start.disabled=!ok};
@@ -2535,6 +2886,7 @@ function renderGate(){
     saveProfile(form.value());haptic(20);hideGate();hud("All set");
   };
   g.appendChild(start);
+  formKeys(form,()=>start.click());
   paintIn(g);form.refresh();
 }
 
@@ -2543,15 +2895,17 @@ function renderGate(){
    ========================================================================== */
 const TITLES={diary:"Diary",foods:"Foods",progress:"Progress",me:"Me"};
 let curTab="diary";
+const tabY={};
 function showTab(t){
   if(!TITLES[t])t="diary";
+  const same=t===curTab;tabY[curTab]=scrollY;
   curTab=t;
   for(const k in TITLES)$("v-"+k).classList.toggle("hidden",k!==t);
   document.querySelectorAll(".tabbar button").forEach(b=>{
     if(b.dataset.tab===t)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current");
   });
   try{history.replaceState(null,"","#"+t)}catch(e){}
-  closeRow();renderAll();scrollTo(0,0);syncNav();
+  closeRow();renderAll();scrollTo(0,same?0:(tabY[t]||0));syncNav();
 }
 document.querySelectorAll(".tabbar button").forEach(b=>b.addEventListener("click",()=>{haptic();showTab(b.dataset.tab)}));
 function renderAll(){
@@ -2563,7 +2917,8 @@ function renderAll(){
   if(curTab==="progress")renderProgress();
   if(curTab==="me")renderMe();
   allSegs().forEach(paintSeg);
-  $("meTab").classList.toggle("due",backupDue());
+  /* The badge is part of the tab's name. */
+  const due=backupDue();$("meTab").classList.toggle("due",due);$("meDue").textContent=due?", backup due":"";
 }
 function syncNav(){
   const bar=$("navbar"),t=$("title").getBoundingClientRect();
@@ -2575,10 +2930,14 @@ function syncNav(){
 }
 addEventListener("scroll",syncNav,{passive:true});
 addEventListener("resize",syncNav);
+/* A rotation redraws the charts at the new width. Only a width change: iOS
+   resizes the height as its toolbars come and go. */
+let progW=innerWidth;
+addEventListener("resize",()=>{if(innerWidth!==progW){progW=innerWidth;if(curTab==="progress")renderProgress()}});
 
 $("prevDay").addEventListener("click",()=>{haptic();cur=shiftKey(cur,-1);renderAll()});
 $("nextDay").addEventListener("click",()=>{if(cur>=todayKey())return;haptic();cur=shiftKey(cur,1);renderAll()});
-$("dateBtn").addEventListener("click",async()=>{const k=await pickDate({value:cur});if(k){cur=k;renderAll()}});
+$("dateBtn").addEventListener("click",async()=>{const k=await pickDate({value:cur,title:"Jump to a day"});if(k){cur=k;renderAll()}});
 $("weightRow").addEventListener("click",()=>openWeight(cur));
 $("nutriRow").addEventListener("click",()=>openNutrition(cur));
 
