@@ -31,6 +31,9 @@
   --red-text:#d70015; --green-text:#248a3d; --alert:rgba(249,249,249,.9); --tab-off:#8e8e93;
   --pink:#ff2d55; --teal:#30b0c7; --indigo:#5856d6; --purple:#af52de;
   --gold-weak:rgba(255,149,0,.12);
+  /* Source tags are 11 px, so they need 4.5:1: Increase Contrast's grey and
+     blue, on their own fills. */
+  --tag:rgba(60,60,67,.76); --tag-me:#0040dd; --tag-me-bg:rgba(0,122,255,.12);
   /* macros: protein, carbs, fat */
   --pro:#ff2d55; --carb:#30b0c7; --fat:#ff9500;
   --pop:0 10px 34px rgba(0,0,0,.14),0 1px 3px rgba(0,0,0,.1);
@@ -53,6 +56,7 @@
   --red-text:#ff453a; --green-text:#30d158; --alert:rgba(44,44,46,.74);
   --pink:#ff375f; --teal:#40cbe0; --indigo:#5e5ce6; --purple:#bf5af2;
   --gold-weak:rgba(255,159,10,.18);
+  --tag:rgba(235,235,245,.7); --tag-me:#5eb0ff; --tag-me-bg:rgba(10,132,255,.16);
   --pro:#ff375f; --carb:#40cbe0; --fat:#ff9f0a;
   --thumb:#636366; --thumb-sh:0 3px 8px rgba(0,0,0,.3);
   --pop:0 10px 34px rgba(0,0,0,.5); --lift:0 -14px 50px rgba(0,0,0,.6);
@@ -69,6 +73,7 @@
   --red-text:#ff453a; --green-text:#30d158; --alert:rgba(44,44,46,.74);
   --pink:#ff375f; --teal:#40cbe0; --indigo:#5e5ce6; --purple:#bf5af2;
   --gold-weak:rgba(255,159,10,.18);
+  --tag:rgba(235,235,245,.7); --tag-me:#5eb0ff; --tag-me-bg:rgba(10,132,255,.16);
   --pro:#ff375f; --carb:#40cbe0; --fat:#ff9f0a;
   --thumb:#636366; --thumb-sh:0 3px 8px rgba(0,0,0,.3);
   --pop:0 10px 34px rgba(0,0,0,.5); --lift:0 -14px 50px rgba(0,0,0,.6);
@@ -247,8 +252,8 @@ button.fr:active{background:var(--f4)}
 .fk{flex:none;font-size:17px;letter-spacing:-.026em;font-variant-numeric:tabular-nums;color:var(--lab);text-align:right;white-space:nowrap}
 .fk small{display:block;font-size:12px;color:var(--lab2);letter-spacing:0}
 .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:1px 5px;border-radius:4px;
-  background:var(--f3);color:var(--lab2);margin-right:5px;vertical-align:1px}
-.tag.me{background:var(--tint-weak);color:var(--tint)}
+  background:var(--f3);color:var(--tag);margin-right:5px;vertical-align:1px}
+.tag.me{background:var(--tag-me-bg);color:var(--tag-me)}
 
 /* ==========================================================================
    Segmented control
@@ -326,12 +331,34 @@ button.fr:active{background:var(--f4)}
   background:var(--raised);color:var(--tint);font-size:13px;font-weight:500;letter-spacing:-.006em;
   transition:transform .12s,background .12s}
 .act:active{transform:scale(.96);background:var(--f3)}
-.act span{color:var(--lab)}
+.act span{color:var(--lab);white-space:nowrap}
+/* Four tiles still fit "Quick add" whole at 320. */
+.acts.four{grid-template-columns:repeat(4,1fr);gap:6px}
+.acts.four .act{padding-left:2px;padding-right:2px}
+/* A ghost button with a glyph before its label. */
+.btn.ico{display:flex;align-items:center;justify-content:center;gap:8px}
+.btn.ico:disabled{color:var(--lab3)}
+/* Describe: a multi-line field that grows with what is said. */
+.ta{display:block;width:100%;min-height:calc(5 * 1.29em + 22px);border:0;background:none;resize:none;
+  padding:11px 16px;font-size:17px;line-height:1.29;letter-spacing:-.026em;color:var(--lab);overflow:hidden}
+.ta::placeholder{color:var(--lab3)}
+.ta[readonly]{color:var(--lab2)}
+/* The barcode row's scanner: 44 to the finger, flush with the row's edge. */
+.fscan{width:44px;height:44px;margin:-9px -10px -9px 0;border-radius:10px;color:var(--tint);flex:none;
+  display:flex;align-items:center;justify-content:center;transition:background .12s,opacity .12s}
+.fscan:active{background:var(--f4)}
+.fscan:disabled{color:var(--lab3)}
+.tag.est{background:var(--gold-weak);color:var(--lab)}
+/* A long value wraps under its own column rather than squeezing the label. */
+.cell.wrapv .cl{flex:none}
+.cell.wrapv .cv{flex:1;min-width:0;white-space:normal}
 
 /* ==========================================================================
    Swipe-to-delete rows
    ========================================================================== */
 .sw{position:relative;overflow:hidden;touch-action:pan-y}
+/* A held row opens its menu, not the text-selection callout. */
+.sw.hold{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .sw+.sw::before{content:"";position:absolute;top:0;left:16px;right:0;z-index:2;
   border-top:.5px solid var(--sep)}
 /* Hidden until a swipe starts: a row of fractional height lets the red edge
@@ -388,6 +415,7 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .ov-back{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;
   transition:opacity .34s var(--ease)}
 .ov-back.clear{background:transparent;transition:none}
+.ov-back.dim{background:rgba(0,0,0,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);transition:opacity .2s}
 .ov.in .ov-back{opacity:1}
 /* Dismissing is a fade, and the page answers taps at once. */
 .ov.out,.ov.out *{pointer-events:none!important}
@@ -431,6 +459,8 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .menu-item span small{display:block;font-size:13px;color:var(--lab2);letter-spacing:-.006em;white-space:normal}
 .menu-item svg{color:var(--lab)}
 .menu-item.dest,.menu-item.dest svg{color:var(--red-text)}
+.menu-item:disabled{color:var(--lab3);cursor:default}
+.menu-item:disabled:active{background:none}
 .menu-item .ck-i{color:var(--lab);opacity:0}
 .menu-item.sel .ck-i{opacity:1}
 .menu-title{padding:9px 15px 8px;font-size:13px;line-height:1.3;letter-spacing:-.006em;color:var(--lab2);
@@ -461,6 +491,12 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .sheet-bar button:active{opacity:.4}
 .sheet-bar button:disabled{color:var(--lab3)}
 .sheet-bar button.l{text-align:left}.sheet-bar button.r{text-align:right;font-weight:600}
+/* A progress label ("Reading…") takes its room from the left padding, so
+   the title keeps its width at 320. Short labels sit at min-width anyway. */
+.sheet-bar button.r:disabled{padding-left:0}
+/* Buttons of unequal width are evened up (see sheet()) so the title stays
+   centred; the gaps give up the room that takes. */
+.sheet-bar.even{gap:4px}
 .sheet-body{padding:0 16px calc(env(safe-area-inset-bottom,0px) + 18px);overflow-y:auto;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;flex:1;min-height:0}
 
@@ -500,6 +536,9 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .hud.in{opacity:1;transform:translate(-50%,-50%) scale(1)}
 .hud svg{margin:0 auto 9px;color:var(--lab)}
 .hud span{font-size:15px;font-weight:500;letter-spacing:-.016em}
+/* UIActivityIndicatorView: the spokes step round rather than glide. */
+.hud .spin{animation:spin .9s steps(8) infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 /* Calendar (UIDatePicker .inline, from Habits) */
 .cal{-webkit-user-select:none;user-select:none}
@@ -560,7 +599,7 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
 .bday{display:grid;align-items:center;column-gap:4px;padding:2px 0}
 .cell[aria-expanded="true"] .cv{color:var(--tint)}
 
-@media (prefers-reduced-motion:reduce){.sheet,.ov-back,.alert,.menu,.hud,.seg .thumb,.sw-in,.bar span,.ring .val,.tgl,.tgl span,.prayer i,.ck,.cal-title svg{transition:none!important}.navbar .nt{transform:none;transition:opacity .2s ease}.prayer.pop i,.cal-grid.slide-l,.cal-grid.slide-r{animation:none}}
+@media (prefers-reduced-motion:reduce){.sheet,.ov-back,.alert,.menu,.hud,.seg .thumb,.sw-in,.bar span,.ring .val,.tgl,.tgl span,.prayer i,.ck,.cal-title svg{transition:none!important}.navbar .nt{transform:none;transition:opacity .2s ease}.prayer.pop i,.cal-grid.slide-l,.cal-grid.slide-r,.hud .spin{animation:none}}
 </style>
 </head>
 <body>
@@ -605,6 +644,7 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
     <div class="card" id="libList" style="margin-top:12px"></div>
     <p class="foot" id="libFoot"></p>
     <button class="btn" id="libNew"></button>
+    <button class="btn ghost ico hidden" id="libDescribe" type="button"></button>
   </section>
 
   <!-- ================= Progress ================= -->
@@ -628,6 +668,7 @@ body.gated .navbar,body.gated main,body.gated .tabbar{display:none}
     <div class="card" style="margin-top:22px">
       <button class="cell" id="editProfile"><span class="cl">Profile and goal</span><span class="cv" id="goalVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
       <button class="cell" id="editTargets"><span class="cl">Adjust targets</span><span class="cv" id="customVal"></span><svg class="chev" width="9" height="15" viewBox="0 0 9 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5 7 7.5l-5.5 6"/></svg></button>
+      <button class="cell" id="burnRow"><span class="cl">Base targets on</span><span class="cv" id="burnVal"></span><span class="tintc"><svg width="11" height="15" viewBox="0 0 11 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m1.5 5 4-3.5 4 3.5M1.5 10l4 3.5 4-3.5"/></svg></span></button>
     </div>
     <div class="shdr"><h2 class="t">App</h2></div>
     <div class="card">
@@ -706,8 +747,10 @@ const KCAL_PER_KG=7700;
    the same way everywhere, and a deleted entry stays deleted.
    ========================================================================== */
 const LS="calories-v1";
+/* burn: which burn the targets start from. Added later, so a meta without it
+   reads as the formula, t:0 losing to any real choice when merged. */
 const metaBlank=()=>({profile:null,goal:{type:"maintain",pace:"slow",t:0},custom:{kcal:null,protein:null,t:0},
-  recipes:{},meals:{},theme:"auto",backedUp:null});
+  burn:{mode:"formula",t:0},recipes:{},meals:{},theme:"auto",backedUp:null});
 const syncBlank=()=>({at:null,dd:{},dm:0,df:{}});
 const blank=()=>({v:1,key:null,meta:metaBlank(),days:{},foods:{},sync:syncBlank()});
 function normalize(p){
@@ -776,6 +819,13 @@ const SEARCH_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" st
 const SCAN_SVG='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 8V5.5a2 2 0 0 1 2-2H8M16 3.5h2.5a2 2 0 0 1 2 2V8M20.5 16v2.5a2 2 0 0 1-2 2H16M8 20.5H5.5a2 2 0 0 1-2-2V16M7.5 8v8M10.5 8v8M13.5 8v8M16.5 8v8"/></svg>';
 const BOLT_SVG='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M13.4 2.6 4.8 13.4h6.4l-1 8 8.6-10.8h-6.4z"/></svg>';
 const NEW_SVG='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14.5 3.5V8H19M12 11v6M9 14h6"/></svg>';
+/* SF Symbols' waveform, for everything that starts from what was said. */
+const WAVE_SVG='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3.5 10.5v3M7 7.5v9M10.5 4v16M14 8v8M17.5 5.5v13M21 10v4"/></svg>';
+const WAVE_SM=WAVE_SVG.replace('width="26" height="26"','width="20" height="20"');
+const CAM_SVG='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 8.6a2 2 0 0 1 2-2h2.7l1.7-2.4h5.2l1.7 2.4H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13.2" r="3.7"/></svg>';
+/* A still activity indicator; .hud .spin steps it round. */
+const SPIN='<svg class="spin" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">'+
+  [0,1,2,3,4,5,6,7].map(i=>`<path d="M12 2.8v4.4" transform="rotate(${-i*45} 12 12)" opacity="${(1-i*.11).toFixed(2)}"/>`).join("")+"</svg>";
 
 /* ==========================================================================
    Body maths
@@ -811,7 +861,17 @@ function plan(k,draft,{noCustom}={}){
   const kg=(draft?p.kg:weightOn(k))||p.kg;
   const age=ageOf(p);
   const bmr=10*kg+6.25*p.cm-5*age+(p.sex==="f"?-161:5);
-  const tdee=bmr*p.act;
+  const formula=bmr*p.act;
+  /* A measured burn replaces the formula only when asked for, and within a
+     quarter of it either way: a fortnight of noisy logging should nudge the
+     target, not halve it. A draft profile uses it too, so the Profile sheet
+     previews what saving will apply; the measurement does not depend on the
+     profile, only the clamp does. */
+  let tdee=formula,burn="formula",measured=null;
+  if(S.meta.burn&&S.meta.burn.mode==="measured"){
+    measured=measuredBurn(k||todayKey());
+    if(measured.kcal){tdee=clampNum(measured.kcal,formula*.75,formula*1.25);burn="measured"}
+  }
   const r=((RATE[g.type]||RATE.maintain)[g.pace])||0;
   const wanted=tdee+r*kg*KCAL_PER_KG/7;
   let kcal=wanted,floor=null,limited=false;
@@ -827,8 +887,29 @@ function plan(k,draft,{noCustom}={}){
   protein=Math.round(protein);
   const fat=Math.round(Math.max(.6*kg,kcal*.3/9));
   const carbs=Math.max(0,Math.round((kcal-protein*4-fat*9)/4));
-  return{kg,age,bmr,tdee,kcal,protein,fat,carbs,limited,custom,customProtein:c.protein>0,
+  return{kg,age,bmr,tdee,formula,burn,measured,kcal,protein,fat,carbs,limited,custom,customProtein:c.protein>0,
     weekly:(kcal-tdee)*7/KCAL_PER_KG,rate:r};
+}
+/* What the scale and the diary say this body burns. Over the 28 days ending
+   yesterday: the trend's change between the first and last weigh-in, against
+   what was eaten on the days between. Needs weigh-ins over two weeks and food
+   on most of those days, or it is noise. Returns {kcal,…} or {need:"…"}. */
+function measuredBurn(endKey=todayKey()){
+  const lo=shiftKey(endKey,-28),hi=shiftKey(endKey,-1);
+  const ws=trendOf(weighIns()).filter(w=>w.k>=lo&&w.k<=hi);
+  if(ws.length<3){const n=3-ws.length;return{need:`${n} more weigh-in${n===1?"":"s"}`}}
+  const a=ws[0],b=ws[ws.length-1],span=daysBetween(a.k,b.k);
+  if(span<14){const n=14-span;return{need:`Weigh in ${n} more day${n===1?"":"s"}`}}
+  /* The morning weigh-in follows the day before, so the first day counts
+     and the last one does not. */
+  let logged=0,eaten=0;
+  for(let i=0;i<span;i++){const l=entries(shiftKey(a.k,i));if(l.length){logged++;eaten+=totals(l).t[0]}}
+  const want=Math.ceil(span*.7);
+  if(logged<want){const n=want-logged;return{need:`Log ${n} more day${n===1?"":"s"}`}}
+  const kcal=eaten/logged-(b.t-a.t)*KCAL_PER_KG/span;
+  /* Half-logged days read as a body that burns almost nothing. */
+  if(!(kcal>=800&&kcal<=6000))return{need:"Log whole days"};
+  return{kcal:Math.round(kcal/10)*10,days:span,from:a.k,to:b.k,logged};
 }
 const paceText=w=>{
   const a=Math.abs(w);
@@ -890,7 +971,7 @@ function splitPortion(label){
 }
 /* Grams first: the subtitle ellipsizes at the end, and they are the one
    unambiguous quantity. A quick add shows the macros that were entered. */
-function amountText(e){
+function amountOnly(e){
   if(e.u==="quick"){
     const n=e.n||[];
     return [[NI.protein,"protein"],[NI.carbs,"carbs"],[NI.fat,"fat"]].filter(([i])=>n[i]!=null)
@@ -901,6 +982,9 @@ function amountText(e){
   const amt=q===1?e.u:!p.bare&&p.num!==1&&!e.u.includes("/")?`${fmtN(q*p.num,2)} ${p.unit}`:`${fmtN(q,2)} × ${e.u}`;
   return `${fmtN(e.g)} g · ${amt}`;
 }
+/* An AI estimate says so wherever it is listed: its numbers are a guess, not
+   a database's. */
+const amountText=e=>amountOnly(e)+(e.ref==="ai"?" · estimate":"");
 
 /* ==========================================================================
    Sync — Supabase over plain fetch, so the app stays one file with no
@@ -938,12 +1022,12 @@ function mergeDay(a,b){
 }
 /* Only the parts that belong to the person travel; theme and backup date are
    this phone's business. */
-const metaForServer=()=>({profile:S.meta.profile,goal:S.meta.goal,custom:S.meta.custom,
+const metaForServer=()=>({profile:S.meta.profile,goal:S.meta.goal,custom:S.meta.custom,burn:S.meta.burn,
   recipes:S.meta.recipes,meals:S.meta.meals});
 function mergeMeta(a,b){
   if(!b||typeof b!=="object")return a;
   const o=Object.assign({},a);
-  o.profile=lww(a.profile,b.profile);o.goal=lww(a.goal,b.goal);o.custom=lww(a.custom,b.custom);
+  o.profile=lww(a.profile,b.profile);o.goal=lww(a.goal,b.goal);o.custom=lww(a.custom,b.custom);o.burn=lww(a.burn,b.burn);
   o.recipes=mergeMap(a.recipes,b.recipes);o.meals=mergeMap(a.meals,b.meals);
   return o;
 }
@@ -1011,6 +1095,8 @@ async function syncNow(){
     S.sync.last=new Date().toISOString();
     saveLocal();setSync("on");lastSyncOk=true;
     if(changed)renderAll();
+    /* Once per launch, quietly: whether AI is on, before anyone taps it. */
+    if(!aiChecked){aiChecked=true;aiStatus()}
   }catch(e){
     ok=false;lastSyncOk=false;setSync("off");
     if(/unknown key/.test(e.message)){
@@ -1109,9 +1195,11 @@ const confirmBox=(title,message,label="Delete",destructive=true)=>alertBox({titl
   {label:"Cancel",style:"cancel",value:false},{label,style:destructive?"destructive":"default",value:true}]}).then(v=>v===true);
 const tellUser=(title,message)=>alertBox({title,message,actions:[{label:"OK",style:"cancel"}]});
 
-function menu(anchor,items){
+/* dim: a context menu (press and hold) dims and blurs what is behind it, as
+   iOS does; a pull-down menu from a button leaves the page as it is. */
+function menu(anchor,items,{dim}={}){
   const root=overlay("menu-ov");
-  const back=el("div","ov-back clear");
+  const back=el("div","ov-back"+(dim?" dim":" clear"));
   const m=el("div","menu");
   m.setAttribute("role","menu");m.tabIndex=-1;
   items.forEach(it=>{
@@ -1120,6 +1208,9 @@ function menu(anchor,items){
     const b=el("button","menu-item"+(it.destructive?" dest":"")+(it.selected?" sel":""));
     if(it.selected!==undefined){b.setAttribute("role","menuitemradio");b.setAttribute("aria-checked",String(!!it.selected))}
     else b.setAttribute("role","menuitem");
+    /* A choice that is not available yet stays in view, with its reason as
+       the detail. */
+    if(it.disabled)b.disabled=true;
     b.innerHTML=`<span>${esc(it.label)}${it.detail?`<small>${esc(it.detail)}</small>`:""}</span>`+(it.selected!==undefined?CHECK:(it.icon||""));
     b.onclick=()=>{root.close();haptic();it.onSelect&&it.onSelect()};
     m.appendChild(b);
@@ -1167,24 +1258,36 @@ function sheet({title,left="Cancel",right,onRight,build,tall,dirty}){
   body.addEventListener("scroll",()=>bar.classList.toggle("edge",body.scrollTop>0),{passive:true});
   s.append(zone,bar,body);
   root.append(back,s);
+  /* root.asking is true while "Discard changes?" waits for an answer, so work
+     that finishes meanwhile can hold its result; root.onKept runs on Keep
+     Editing. */
   const tryClose=()=>{
     s.style.transform="";
+    if(root.asking)return;
     let d=false;try{d=!!(dirty&&dirty())}catch(e){}
-    if(d){alertBox({title:"Discard changes?",actions:[{label:"Keep Editing",style:"cancel",value:false},
-      {label:"Discard",style:"destructive",value:true}]}).then(v=>{if(v===true)root.close()});return}
+    if(d){root.asking=true;alertBox({title:"Discard changes?",actions:[{label:"Keep Editing",style:"cancel",value:false},
+      {label:"Discard",style:"destructive",value:true}]}).then(v=>{root.asking=false;if(v===true)root.close();else if(root.onKept)root.onKept()});return}
     root.close();
   };
   lb.onclick=tryClose;back.onclick=tryClose;
+  /* The title stays centred whatever the buttons say: a wider label
+     ("Reading…") widens the other side to match. */
+  const even=()=>{
+    lb.style.minWidth=rb.style.minWidth="";bar.classList.remove("even");
+    const a=lb.offsetWidth,b=rb.offsetWidth;
+    if(!a||!b||a===b)return;
+    lb.style.minWidth=rb.style.minWidth=Math.max(a,b)+"px";bar.classList.add("even");
+  };
   root.setTitle=t=>{tt.textContent=t};
-  root.setLeft=t=>{lb.textContent=t;lb.style.visibility=t?"":"hidden"};
-  root.setRight=(t,enabled=true)=>{rb.textContent=t;rb.style.visibility=t?"":"hidden";rb.disabled=!enabled};
+  root.setLeft=t=>{lb.textContent=t;lb.style.visibility=t?"":"hidden";even()};
+  root.setRight=(t,enabled=true)=>{rb.textContent=t;rb.style.visibility=t?"":"hidden";rb.disabled=!enabled;even()};
   /* Return in a form's last field: the same as tapping the trailing button. */
   root.submit=()=>{if(rb.style.visibility!=="hidden"&&!rb.disabled)rb.click()};
   root.body=body;
   /* A sheet that throws while building must still appear, or its invisible
      backdrop sits over the app and swallows every tap. */
   try{build(body,root)}catch(e){console.error(e);body.appendChild(el("p","foot err","Something went wrong here."))}
-  root.show();if(!s.contains(document.activeElement))s.focus({preventScroll:true});
+  root.show();even();if(!s.contains(document.activeElement))s.focus({preventScroll:true});
 
   let y0=0,dy=0,dragging=false;
   const down=e=>{
@@ -1478,6 +1581,24 @@ function swipeRow(inner,onTap,onDelete){
   swipeable(row);
   return row;
 }
+/* Press and hold opens a row's context menu, as on iOS: half a second without
+   moving. A right-click, or Android's own long-press event, does the same.
+   The tap that ends a hold is swallowed, so the row does not open as well.
+   Swiping moves the finger, which cancels the hold. */
+const HOLD_MS=500;
+function longPress(row,onHold){
+  let timer=null,x0=0,y0=0,fired=false;
+  const cancel=()=>{clearTimeout(timer);timer=null};
+  row.addEventListener("pointerdown",e=>{
+    if(e.button>0)return;
+    fired=false;x0=e.clientX;y0=e.clientY;cancel();
+    timer=setTimeout(()=>{timer=null;fired=true;closeRow();haptic(12);onHold()},HOLD_MS);
+  });
+  row.addEventListener("pointermove",e=>{if(timer&&Math.hypot(e.clientX-x0,e.clientY-y0)>8)cancel()});
+  ["pointerup","pointercancel","pointerleave"].forEach(t=>row.addEventListener(t,cancel));
+  row.addEventListener("click",e=>{if(fired){fired=false;e.stopPropagation();e.preventDefault()}},true);
+  row.addEventListener("contextmenu",e=>{e.preventDefault();cancel();if(!fired){closeRow();onHold()}});
+}
 
 /* ==========================================================================
    Food sources. Everything that can be logged becomes an "item":
@@ -1549,7 +1670,7 @@ function itemFromRef(ref){
 /* An item rebuilt from something already logged: the source if it still
    exists (its portions may be better), the logged snapshot if not. */
 function itemFromEntry(e){
-  const it=itemFromRef(e.ref)||{ref:e.ref,name:e.name,src:"Logged before",n:e.n,
+  const it=itemFromRef(e.ref)||{ref:e.ref,name:e.name,src:e.ref==="ai"?"Estimate":"Logged before",n:e.n,
     portions:e.u&&e.u!=="g"&&e.q>0?[[e.u,e.g/e.q]]:[]};
   return Object.assign({},it,{q:e.q,u:e.u||"g",name:e.name||it.name});
 }
@@ -1567,7 +1688,8 @@ function recents(meal){
     const k=keyOf(addDays(t,-i));
     for(const e of entries(k)){
       if(e.u==="quick")continue;
-      const key=e.ref||("n:"+e.name);
+      /* Every estimate shares the ref "ai", so they are told apart by name. */
+      const key=e.ref&&e.ref!=="ai"?e.ref:("n:"+e.name);
       let r=map.get(key);
       if(!r){r={e,count:0,inMeal:0};map.set(key,r)}
       r.count++;if(e.m===meal)r.inMeal++;
@@ -1825,6 +1947,434 @@ async function handleBarcode(code,onItem){
 }
 
 /* ==========================================================================
+   AI logging. A Supabase Edge Function (cal-ai) holds the Anthropic key and
+   counts each person's use; this page never sees a key. The model only ever
+   gets text or a photo, and nothing it says is saved until it is checked.
+   ========================================================================== */
+const AI_URL=SB_URL+"/functions/v1/cal-ai";
+/* "unknown" until a status reply or an error says otherwise. aiAt is when a
+   reply last said "on" or "off": an "off" older than AI_RECHECK is asked
+   again, since the owner may have added the key since. */
+let aiState="unknown",aiUse=null,aiLast=null,aiStatusP=null,aiChecked=false,aiAt=0;
+const AI_RECHECK=5*60000;
+const aiWatch=new Set();
+/* The server counts by its own date, which is UTC. */
+const utcDay=()=>new Date().toISOString().slice(0,10);
+function aiSet(state,use){
+  if(state){aiState=state;aiAt=Date.now()}
+  if(use)aiUse={used:use.used,limit:use.limit,day:utcDay()};
+  aiWatch.forEach(f=>{try{f()}catch(e){}});
+}
+const aiErr=(code,x)=>Object.assign(new Error(code),{code},x||{});
+const aiCount=j=>j&&typeof j.used==="number"&&j.used>=0&&j.limit>0?{used:j.used,limit:j.limit}:null;
+/* A reply, read: the JSON, or an Error whose .code says why not. Only a 404
+   means nothing is there. A page that is not JSON is a gateway in trouble
+   (502, 504) or a Wi-Fi login page, so it reads as busy, which passes;
+   another 4xx page is not the function either. */
+function aiRead(r,txt){
+  let j;try{j=JSON.parse(txt)}catch(e){j=null}
+  if(r.status===404)throw aiErr("not_deployed");
+  if(!j||typeof j!=="object")throw aiErr(r.ok||r.status>=500?"busy":"not_deployed");
+  if(!r.ok||j.error)throw aiErr(typeof j.error==="string"?j.error:r.status>=500?"busy":"not_deployed",{limit:j.limit,use:aiCount(j)});
+  return j;
+}
+/* Resolves with the reply, or throws an Error whose .code is the server's
+   error, not_deployed, offline, timeout, or cancelled (signal aborted). */
+async function aiCall(task,payload,{ms=36000,signal}={}){
+  let j;
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),ms);
+  const stop=()=>ctl.abort();
+  if(signal){if(signal.aborted)stop();else signal.addEventListener("abort",stop)}
+  const why=()=>signal&&signal.aborted?"cancelled":"timeout";
+  try{
+    if(navigator.onLine===false)throw aiErr("offline");
+    let r,txt;
+    try{
+      r=await fetch(AI_URL,{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({key:S.key,task},payload)),signal:ctl.signal});
+      txt=await r.text();
+    }catch(e){
+      if(ctl.signal.aborted)throw aiErr(why());
+      /* These headers make the browser ask the server first (a preflight).
+         Where no function is deployed the gateway refuses that, and the
+         browser reports it exactly like no connection. A plain request needs
+         no asking, so any reply to one means the server is there: it asks
+         for status, which is free, and is read like any other reply. */
+      let pr,ptxt;
+      try{
+        pr=await fetch(AI_URL,{method:"POST",body:JSON.stringify({key:S.key,task:"status"}),signal:ctl.signal});
+        ptxt=await pr.text();
+      }catch(e2){throw aiErr(ctl.signal.aborted?why():"offline")}
+      const pj=aiRead(pr,ptxt);
+      if(task!=="status"){
+        /* The function answers, so the request itself was lost on the way. */
+        aiSet(pj.configured===false?"off":"on",aiCount(pj));
+        throw aiErr(pj.configured===false?"not_configured":"busy",{use:aiCount(pj)});
+      }
+      r=pr;txt=ptxt;
+    }
+    j=aiRead(r,txt);
+  }catch(e){
+    /* Stopped by the person: nothing was learned. */
+    if(e.code==="cancelled")throw e;
+    aiLast=e.code||"busy";
+    if(/^(not_configured|not_deployed|bad_key)$/.test(aiLast))aiSet("off");
+    else if(/^(daily|group)_limit$/.test(aiLast))aiSet("on",e.use||(aiLast==="daily_limit"&&e.limit>0?{used:e.limit,limit:e.limit}:null));
+    else aiSet(null,e.use);
+    /* The server counts a request that got as far as Claude, answered or
+       not. When the reply did not say the new count, ask for it, so the
+       count shown is the server's. Not after bad_key: status would call a
+       rejected key "configured" and turn AI back on. */
+    if(task!=="status"&&!e.use&&!/^(offline|not_configured|not_deployed|bad_key|unknown_key|bad_request|daily_limit|group_limit)$/.test(aiLast))
+      setTimeout(aiStatus,0);
+    throw e;
+  }finally{clearTimeout(timer);if(signal)signal.removeEventListener("abort",stop)}
+  aiLast=null;
+  if(task==="status")aiSet(j.configured?"on":"off",{used:Math.max(0,+j.used||0),limit:+j.limit||60});
+  else aiSet("on",aiCount(j)||(aiUse?{used:aiUse.used+1,limit:aiUse.limit}:null));
+  return j;
+}
+/* One status check at a time. It never counts towards the limit. */
+function aiStatus(){
+  if(!S.key)return Promise.resolve(null);
+  if(!aiStatusP){aiStatusP=aiCall("status",{},{ms:10000}).catch(()=>null).then(j=>{aiStatusP=null;aiSet();return j});aiSet()}
+  return aiStatusP;
+}
+/* Worth asking again: still unknown, or an "off" or a used-up day that is
+   a few minutes old. */
+const aiSpent=()=>aiState==="on"&&!!aiUse&&aiUse.limit>0&&aiUse.used>=aiUse.limit&&aiUse.day===utcDay();
+const aiStale=()=>aiState==="unknown"||((aiState==="off"||aiSpent())&&Date.now()-aiAt>AI_RECHECK);
+/* kind: "text" (a description), "list" (a recipe or meal), "photo", "label". */
+function aiExplain(e,{kind="text"}={}){
+  const c=e&&e.code,pic=kind==="photo"||kind==="label";
+  const [title,message]=
+    /^(not_configured|not_deployed|bad_key)$/.test(c)?["AI isn’t switched on yet","This group’s server doesn’t have an AI key yet, so describing food and reading photos are off. Search, scan and quick add work as usual."]:
+    c==="daily_limit"?["That’s today’s AI limit",`You can use AI ${e.limit>0?e.limit:60} times a day. It resets tomorrow. Search, scan and quick add work as usual.`]:
+    c==="group_limit"?["The group’s AI limit is used up","Everyone in the group shares a daily AI allowance, and today’s has run out. It resets tomorrow. Search, scan and quick add work as usual."]:
+    c==="offline"?["You’re offline",kind==="label"?"Reading a label needs a connection. You can still type the numbers in.":
+      `${pic?"Reading a photo":"Describing food"} needs a connection. Search and quick add still work offline.`]:
+    c==="timeout"?["That took too long","Try again in a moment."]:
+    c==="busy"?["Claude is busy","Try again in a moment."]:
+    c==="refused"||c==="unreadable"?["Couldn’t read that",
+      kind==="label"?"Try a clearer photo of the nutrition table, straight on and in good light, or type the numbers in.":
+      kind==="photo"?"Try a clearer photo, from above with the whole plate in it, or add the food by hand.":
+      kind==="list"?"Try saying it another way, with what goes in and roughly how much, or add the items by hand.":
+      "Try saying it another way, with what you ate and roughly how much, or add the food by hand."]:
+    c==="bad_image"?["Couldn’t open that photo","Try taking it again."]:
+    c==="bad_request"?["Couldn’t send that",pic?"Try another photo.":"Try a shorter description."]:
+    c==="unknown_key"?["This phone isn’t recognised","The server doesn’t know this phone’s key, so AI can’t be used. Check it under Me → Data and sync."]:
+    ["Something went wrong","Try again in a moment."];
+  return tellUser(title,message);
+}
+/* Before an AI sheet opens, so nobody types into a dead end. An unknown
+   state is checked first; a check that cannot finish lets the sheet open,
+   and the request itself will say what is wrong. */
+let aiGating=false;
+async function aiGate(){
+  if(navigator.onLine===false){aiExplain(aiErr("offline"));return false}
+  if(aiStale()){
+    /* A second tap while checking must not open a second sheet. */
+    if(aiGating)return false;
+    aiGating=true;
+    let hide=null;const t=setTimeout(()=>{hide=hud("Checking…",SPIN,{hold:true})},350);
+    await aiStatus();
+    clearTimeout(t);if(hide)hide();aiGating=false;
+    if(aiLast==="offline"||aiLast==="unknown_key"){aiExplain(aiErr(aiLast));return false}
+  }
+  if(aiState==="off"){aiExplain(aiErr("not_configured"));return false}
+  /* Today's allowance is known to be used up: say so before any typing. */
+  if(aiSpent()){aiExplain(aiErr("daily_limit",{limit:aiUse.limit}));return false}
+  return true;
+}
+/* The same for a camera button. The photo picker must open inside the tap,
+   so a state worth checking is checked alongside rather than first: an "off"
+   that has gone stale still says off this time, and the next tap knows. */
+function aiGateNow(kind="photo"){
+  if(navigator.onLine===false){aiExplain(aiErr("offline"),{kind});return false}
+  if(aiStale())aiStatus();
+  if(aiState==="off"){aiExplain(aiErr("not_configured"));return false}
+  if(aiSpent()){aiExplain(aiErr("daily_limit",{limit:aiUse.limit}),{kind});return false}
+  return true;
+}
+/* A status check that timed out met a slow server, not a missing network. */
+const aiText=()=>aiState==="on"?(aiUse?`On · ${fmtN(aiUse.used)} of ${fmtN(aiUse.limit)} today`:"On"):
+  aiState==="off"?"Off — no key on the server":aiStatusP?"Checking…":
+  navigator.onLine===false||aiLast==="offline"?"Unknown (offline)":aiLast==="timeout"?"Unknown (no answer)":"Unknown";
+
+/* One camera input, reused, kept in the document so iOS keeps its change
+   event. Opened straight from the tap; cleared so a photo can be retaken. */
+let camIn=null;
+function pickPhoto(onFile){
+  if(!camIn){
+    camIn=el("input","sr");camIn.type="file";camIn.accept="image/*";camIn.setAttribute("capture","environment");
+    camIn.tabIndex=-1;camIn.setAttribute("aria-hidden","true");document.body.appendChild(camIn);
+  }
+  camIn.value="";
+  camIn.onchange=()=>{const f=camIn.files&&camIn.files[0];if(f)onFile(f)};
+  camIn.click();
+}
+/* A phone photo is several megabytes; a label reads as well at 1280 px. */
+async function jpegBase64(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error("image"));i.src=url});
+    const w0=img.naturalWidth,h0=img.naturalHeight;
+    if(!w0||!h0)throw new Error("image");
+    for(const [max,q] of [[1280,.82],[1024,.7],[800,.6]]){
+      const s=Math.min(1,max/Math.max(w0,h0)),c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(w0*s));c.height=Math.max(1,Math.round(h0*s));
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      const b64=c.toDataURL("image/jpeg",q).split(",")[1]||"";
+      if(b64&&b64.length<=2400000)return b64;
+    }
+    throw new Error("image");
+  }finally{URL.revokeObjectURL(url)}
+}
+
+/* Case and accents aside, the same name: "Mămăligă" is "mamaliga". */
+const fold=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim();
+const aiNum=(v,lo,hi)=>typeof v==="number"&&isFinite(v)?clampNum(v,lo,hi):null;
+const aiTime=()=>{const d=new Date();return d.toLocaleDateString("en-GB",{weekday:"short"})+" "+pad(d.getHours())+":"+pad(d.getMinutes())};
+/* The person's own names, most used first, so "my usual" or "the covrigi"
+   can come back as exactly one of these and be matched. */
+function aiNames(exclude){
+  const freq=freqByRef(),seen=new Set(),out=[];
+  const add=s=>{const n=String(s||"").trim().slice(0,80),k=fold(n);if(n&&!seen.has(k)&&out.length<150){seen.add(k);out.push(n)}};
+  const byUse=(list,ref)=>list.map(x=>[x,freq.get(ref(x))||0]).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+  byUse(Object.values(S.meta.recipes).filter(r=>live(r)&&r.id!==exclude),r=>"r:"+r.id).forEach(r=>add(r.name));
+  /* exclude is the recipe or meal being edited: it cannot contain itself. */
+  Object.values(S.meta.meals).filter(m=>live(m)&&m.id!==exclude).forEach(m=>add(m.name));
+  byUse(Object.values(S.foods).filter(live).sort((a,b)=>b.mine-a.mine),f=>"f:"+f.id).forEach(f=>add(foodItem(f).name));
+  return out;
+}
+const aiContext=(meal,exclude)=>({meal,time:aiTime(),foods:aiNames(exclude)});
+
+/* The tag a row wears: where its numbers come from. */
+function sourceTag(ref){
+  if(ref==="ai")return["ESTIMATE"," est"];
+  if(/^u:/.test(ref||""))return["USDA",""];
+  if(/^r:/.test(ref||""))return["RECIPE",""];
+  if(/^f:/.test(ref||"")){const f=S.foods[ref.slice(2)];return f&&f.mine?["YOU"," me"]:["GROUP",""]}
+  return["",""];
+}
+const rowOf=(item,g,q,u)=>({item,name:item.name,ref:item.ref,n:item.n,g:Math.round(g*10)/10,q,u});
+/* Counted things ("2 eggs") log as the food's own portion when one fits the
+   model's weight within a quarter; otherwise as grams. */
+function rowFromAI(item,ai){
+  let q=ai.grams,u="g",g=ai.grams;
+  if(ai.count>0){
+    let best=null;
+    for(const [lab,pg] of item.portions||[]){
+      const d=Math.abs(pg*ai.count-ai.grams)/ai.grams;
+      if(pg>0&&d<=.25&&(!best||d<best.d))best={lab,pg,d};
+    }
+    if(best){q=ai.count;u=best.lab;g=best.pg*ai.count}
+  }
+  return Object.assign(rowOf(item,g,q,u),{said:ai.said,search:ai.search||ai.name});
+}
+function estimateRow(ai,p){
+  const n=new Array(N.length).fill(null);
+  const set=(key,v)=>{if(v!=null)n[NI[key]]=Math.round(v*10)/10};
+  set("kcal",ai.kcal);set("protein",aiNum(p.protein,0,100));set("fat",aiNum(p.fat,0,100));set("carbs",aiNum(p.carbs,0,100));
+  set("fiber",aiNum(p.fiber,0,100));set("sugar",aiNum(p.sugar,0,100));set("satfat",aiNum(p.satfat,0,100));set("sodium",aiNum(p.sodium,0,40000));
+  return Object.assign(rowOf({ref:"ai",name:ai.name,src:"Estimate",n,portions:[]},ai.grams,ai.grams,"g"),{said:ai.said,search:ai.search||ai.name});
+}
+/* The top search hit, if its calories agree with the model's within 35%,
+   and so do its carbs and protein where either has a few grams: a sauce has
+   a dish's calories but not its carbs ("spaghetti with meat sauce" is not
+   "Spaghetti sauce with meat"). Otherwise the model's own numbers stand, as
+   an estimate. The model's words can be more exact than a database name, so
+   with no hit at all the last word goes, down to two. */
+function searchMatch(ai,exclude){
+  if(ai.kcal==null)return null;
+  const near=(a,b)=>a==null||b==null||Math.abs(a-b)<=Math.max(4,.35*Math.max(a,b));
+  const ok=it=>{const k=it&&it.n&&it.n[0];return k!=null&&((k<40&&ai.kcal<40)||Math.abs(k-ai.kcal)<=.35*ai.kcal)&&
+    near(it.n[NI.carbs],ai.carbs)&&near(it.n[NI.protein],ai.protein)};
+  const w=(ai.search||ai.name).split(/\s+/).filter(Boolean);
+  for(let n=w.length;n>=Math.min(2,w.length)&&n>0;n--){
+    const top=searchItems(w.slice(0,n).join(" "),{mode:"pick",exclude})[0];
+    if(top)return ok(top.item)?top.item:null;
+  }
+  return null;
+}
+/* Each thing said becomes a row: the person's own food, recipe or saved
+   meal when the model named one (a meal opens into its items); else a
+   search hit; else the model's own numbers, kept as an estimate. */
+async function aiMatch(items,{exclude}={}){
+  try{await loadUSDA()}catch(e){}
+  const own=new Map(),put=(name,v)=>{const k=fold(name);if(k&&!own.has(k))own.set(k,v)};
+  Object.values(S.foods).filter(live).sort((a,b)=>b.mine-a.mine).forEach(f=>{const it=foodItem(f);put(it.name,{item:it});put(f.name,{item:it})});
+  Object.values(S.meta.recipes).filter(r=>live(r)&&r.id!==exclude).forEach(r=>put(r.name,{item:recipeItem(r)}));
+  Object.values(S.meta.meals).filter(m=>live(m)&&m.id!==exclude).forEach(m=>put(m.name,{meal:m}));
+  /* exclude is the recipe or meal being edited. It cannot contain itself:
+     said there ("the usual plus a banana"), its own name means what is
+     already in the list, so that item is left out. */
+  const self=exclude&&(S.meta.recipes[exclude]||S.meta.meals[exclude]),selfName=self&&live(self)?fold(self.name):"";
+  const rows=[];
+  for(const it of (Array.isArray(items)?items:[]).slice(0,30)){
+    if(!it||typeof it!=="object")continue;
+    const grams=aiNum(it.grams,0,5000);if(!(grams>0))continue;
+    const p=it.per100&&typeof it.per100==="object"?it.per100:{};
+    const ai={name:String(it.name||it.search||"").trim().slice(0,80)||"Food",search:String(it.search||"").trim().slice(0,80),
+      said:String(it.amount||"").trim().slice(0,40),grams,count:Math.round(aiNum(it.count,0,100)||0),kcal:aiNum(p.kcal,0,900),
+      carbs:aiNum(p.carbs,0,100),protein:aiNum(p.protein,0,100)};
+    if(selfName&&(fold(ai.search)===selfName||fold(ai.name)===selfName))continue;
+    /* Own foods match on search only: the server snaps search to an own food's
+       exact name when it means one, while name is just how it was said and
+       can collide with an own food the model deliberately did not choose. */
+    const hit=own.get(fold(ai.search));
+    if(hit&&hit.meal){
+      /* "Twice" is the meal twice. With no count, the model's weight only
+         counts when it is clearly not one helping, to the nearest half: it
+         never saw the meal's own weights, so it is a guess. */
+      const its=hit.meal.items||[],tot=its.reduce((a,x)=>a+(x.g||0),0);
+      let f=1;
+      if(ai.count>1)f=ai.count;
+      else if(!ai.count&&tot>0){const k=ai.grams/tot;if(k>=1.75||k<=.6)f=Math.max(.5,Math.round(k*2)/2)}
+      const times=v=>v==null?v:Math.round(v*f*100)/100;
+      for(const x of its)rows.push(Object.assign(rowOf(itemFromEntry(x),(x.g||0)*f,times(x.q),x.u||"g"),{said:"",search:x.name}));
+      continue;
+    }
+    const item=hit?hit.item:searchMatch(ai,exclude);
+    rows.push(item?rowFromAI(item,ai):estimateRow(ai,p));
+  }
+  return rows;
+}
+
+/* Describe: say what was eaten, or what goes into a recipe or saved meal.
+   The keyboard's microphone does the listening. task "log" goes on to Check;
+   "recipe" and "meal" open the editor prefilled, or add to the open one
+   (into). The text stays put through any error. */
+const DESCRIBE={
+  log:["Describe","2 scrambled eggs, a slice of toast with butter and a flat white"],
+  recipe:["Describe a recipe","Chilli for 4: 500 g beef mince, 2 tins kidney beans, a tin of chopped tomatoes, an onion, a spoon of oil"],
+  meal:["Describe a meal","Usual breakfast: 60 g oats with a cup of milk, a banana and a black coffee"]};
+function openDescribe({task="log",meal=guessMeal(),k,exclude,into,onAdded}={}){
+  const isLog=task==="log",kind=isLog?"text":"list",name=DESCRIBE[task][0];
+  let ta,photo,busy=false,gone=false;
+  const root=sheet({title:name,left:"Cancel",right:"Next",tall:true,
+    dirty:()=>!gone&&!!ta.value.trim(),
+    onRight:()=>{send();return false},
+    build:body=>{
+      const card=el("div","card");
+      card.innerHTML=`<textarea class="ta" maxlength="2000" autocomplete="off" aria-label="${esc(name)}" placeholder="${esc(DESCRIBE[task][1])}"></textarea>`;
+      ta=card.querySelector("textarea");
+      /* Return is a new line here; Next is the bar button. */
+      ta.addEventListener("input",()=>{grow();if(!busy)root.setRight("Next",!!ta.value.trim())});
+      body.append(card,el("p","foot",(isLog?"":"Say what goes in and roughly how much. ")+
+        "Tap the microphone on the keyboard to speak. Nothing is saved until you check it."));
+      if(isLog){
+        photo=el("button","btn ghost ico",`${CAM_SVG}<span>Use a photo</span>`);photo.type="button";
+        photo.onclick=()=>{if(!busy&&aiGateNow())pickPhoto(sendPhoto)};
+        body.appendChild(photo);
+      }
+    }});
+  root.setRight("Next",false);
+  /* Leaving stops a request still being read (the HUD goes with it). A reply
+     that lands while "Discard changes?" is up waits for the answer: Keep
+     Editing shows it, Discard drops it. */
+  let ctl=null,held=null;
+  root.onClosed=()=>{gone=true;held=null;if(ctl)ctl.abort()};
+  root.onKept=()=>{const h=held;held=null;if(h)h()};
+  setTimeout(()=>{if(!gone)ta.focus()},80);
+  function grow(){ta.style.height="auto";ta.style.height=ta.scrollHeight+"px"}
+  function setBusy(on,what){
+    busy=on;ta.readOnly=on;
+    if(photo){photo.disabled=on;photo.lastChild.textContent=on&&what==="photo"?"Reading…":"Use a photo"}
+    root.setRight(on&&what!=="photo"?"Reading…":"Next",!on&&!!ta.value.trim());
+  }
+  function send(){
+    const text=ta.value.trim();
+    if(busy)return;
+    if(!text){hud("Say what you ate",WARN);ta.focus();return}
+    ta.blur();setBusy(true,"text");
+    run(signal=>aiCall(task,{text,context:aiContext(meal,exclude)},{signal}),kind);
+  }
+  function sendPhoto(file){
+    if(busy||gone)return;
+    setBusy(true,"photo");
+    run(async signal=>{
+      let image;try{image=await jpegBase64(file)}catch(e){throw aiErr("bad_image")}
+      return aiCall("photo",{image,context:aiContext(meal,exclude)},{signal});
+    },"photo");
+  }
+  async function run(call,how){
+    const hide=hud(how==="photo"?"Reading the photo…":"Reading…",SPIN,{hold:true});
+    let j=null,rows=null,err=null;
+    ctl=new AbortController();
+    try{j=await call(ctl.signal);rows=await aiMatch(j&&j.items,{exclude})}catch(e){err=e}
+    ctl=null;hide();
+    if(gone)return;
+    const show=()=>{
+      if(gone)return;
+      setBusy(false);
+      if(!err&&!rows.length)err=aiErr("unreadable");
+      if(err){aiExplain(err,{kind:how});return}
+      const done=()=>{gone=true;root.close()};
+      if(isLog)openReview({rows,meal:MEAL_NAME[j.meal]?j.meal:meal,k,note:j.note,photo:how==="photo",
+        onAdded:(m,n)=>{done();onAdded&&onAdded(m,n)}});
+      else if(into){into(j,rows);done()}
+      else openListEditor(task,null,{prefill:{j,rows},onSaved:done});
+    };
+    if(root.asking)held=show;else show();
+  }
+  return root;
+}
+
+/* Check: what was understood, before any of it is logged. A row can have
+   its amount changed, another food chosen, or be removed. */
+function openReview({rows,meal="s",k,note,photo,onAdded}){
+  const day=k||cur,list=rows.slice();
+  let m=meal,card,snap0=null;
+  const snap=()=>JSON.stringify([m,list.map(x=>[x.ref,x.name,x.g,x.q,x.u])]);
+  /* As said ("2 large · 100 g") until the person sets it themselves. */
+  const line=x=>x.said?`${x.said} · ${photo?"about ":""}${fmtN(x.g)} g`:amountOnly(x);
+  const root=sheet({title:"Check",left:"Cancel",right:"Add",tall:true,
+    dirty:()=>snap0!==null&&snap()!==snap0,
+    onRight:()=>{
+      if(!list.length){hud("Nothing to add",WARN);return false}
+      const t=now();
+      list.forEach((x,i)=>putEntry(day,{m,name:x.name,ref:x.ref,n:x.n,g:x.g,q:x.q,u:x.u,c:t+i}));
+      renderAll();onAdded&&onAdded(m,list.length);
+    },
+    build:body=>{
+      body.appendChild(makeSeg(MEALS,m,v=>{m=v},"Meal"));
+      card=el("div","card");card.style.marginTop="14px";
+      /* The server's note names one thing to check; it never says a photo is
+         an estimate, so that sentence is always ours. */
+      const said=typeof note==="string"?note.trim().slice(0,200):"";
+      const foot=[photo?"Portions from a photo are rough. Check the amounts.":"",said,
+        "Tap an item to change it, or swipe left to remove it."].filter(Boolean).join(" ");
+      body.append(card,el("p","foot",esc(foot)));
+      draw();
+    }});
+  paintIn(root);snap0=snap();
+  function draw(){
+    card.innerHTML="";
+    for(const x of list){
+      const [tag,cls]=sourceTag(x.ref);
+      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(x.name)}</span><span class="fs">`+
+        (tag?`<span class="tag${cls}">${tag}</span>`:"")+`${esc(line(x))}</span></span><span class="fk">${kc(kcalOf(x))}<small>kcal</small></span>`);
+      b.type="button";
+      card.appendChild(swipeRow(b,()=>rowMenu(b,x),()=>remove(x)));
+    }
+    if(!list.length)card.appendChild(el("p","empty","Nothing left to add."));
+    else card.appendChild(el("div","cell",`<span class="cl" style="font-weight:600">Total</span><span class="cv">${kc(list.reduce((a,x)=>a+kcalOf(x),0))} kcal</span>`));
+  }
+  function remove(x){const i=list.indexOf(x);if(i>=0)list.splice(i,1);draw()}
+  function rowMenu(anchor,x){
+    menu(anchor,[
+      {label:"Change amount",onSelect:()=>openAmount(Object.assign({},x.item,{q:x.q,u:x.u}),{mode:"pick",right:"Done",title:"Change amount",
+        onDone:y=>{Object.assign(x,{g:y.g,q:y.q,u:y.u,said:""});draw()}})},
+      /* "Choose another food" is too long for a sheet title at 320. */
+      {label:"Choose another food",onSelect:()=>openPicker({mode:"pick",title:"Another food",query:x.search||x.name,grams:x.g,right:"Done",
+        onPick:y=>{Object.assign(x,{item:itemFromEntry(y),name:y.name,ref:y.ref,n:y.n,g:y.g,q:y.q,u:y.u,said:""});draw()}})},
+      {label:"Remove",destructive:true,onSelect:()=>remove(x)}]);
+  }
+  return root;
+}
+
+/* ==========================================================================
    Sheets for logging
    ========================================================================== */
 /* A one-field sheet. check returns true, or a message to refuse with. */
@@ -1880,7 +2430,10 @@ function formKeys(root,submit){
 /* ---- Search + add ----
    mode "log" adds to the diary and stays open for the next item;
    mode "pick" returns one item (a recipe ingredient, a meal item). */
-function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
+/* query prefills the search (Choose another food); grams opens the amount
+   at that weight, so a swapped food keeps what was eaten. */
+/* right: the amount sheet's verb in pick mode ("Done" for a sub-edit). */
+function openPicker({meal="s",k,mode="log",exclude,title,onPick,query="",grams,right}={}){
   let timer=null,added=0,input,list;
   const day=k||cur;
   const root=sheet({title:title||(mode==="log"?MEAL_NAME[meal]:"Add an item"),left:"Cancel",tall:true,build:body=>{
@@ -1892,28 +2445,32 @@ function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
        pending debounced render must not run after it. */
     const clr=sw.querySelector(".clr");
     clr.onclick=()=>{input.value="";clr.classList.add("hidden");input.focus();clearTimeout(timer);render()};
-    const acts=el("div","acts"+(mode==="log"?"":" two"));
-    acts.innerHTML=`<button class="act" type="button" data-a="scan">${SCAN_SVG}<span>Scan</span></button>`+
+    if(query){input.value=query;clr.classList.remove("hidden")}
+    const acts=el("div","acts"+(mode==="log"?" four":" two"));
+    acts.innerHTML=(mode==="log"?`<button class="act" type="button" data-a="describe">${WAVE_SVG}<span>Describe</span></button>`:"")+
+      `<button class="act" type="button" data-a="scan">${SCAN_SVG}<span>Scan</span></button>`+
       (mode==="log"?`<button class="act" type="button" data-a="quick">${BOLT_SVG}<span>Quick add</span></button>`:"")+
       `<button class="act" type="button" data-a="new">${NEW_SVG}<span>New food</span></button>`;
     list=el("div");
     body.append(sw,acts,list);
     acts.addEventListener("click",e=>{
       const a=e.target.closest("[data-a]");if(!a)return;haptic();
+      if(a.dataset.a==="describe")aiGate().then(ok=>{if(ok)openDescribe({task:"log",meal,k:day,onAdded:afterAdd})});
       if(a.dataset.a==="scan")openScanner(code=>handleBarcode(code,choose));
       if(a.dataset.a==="quick")openQuickAdd({k:day,meal,onDone:m=>afterAdd(m)});
       if(a.dataset.a==="new")openFoodEditor(null,{onSaved:f=>choose(foodItem(f))});
     });
     input.addEventListener("input",()=>{clr.classList.toggle("hidden",!input.value);clearTimeout(timer);timer=setTimeout(render,110)});
   }});
-  function afterAdd(m){
-    added++;root.setLeft("");root.setRight("Done");renderAll();
-    hud(`Added to ${MEAL_NAME[m]}`);
+  /* n: how many a description added at once. */
+  function afterAdd(m,n){
+    added+=n||1;root.setLeft("");root.setRight("Done");renderAll();
+    hud(n?`Added ${n} item${n===1?"":"s"}`:`Added to ${MEAL_NAME[m]}`);
     if(!input.value)render();
   }
   function choose(item){
-    if(mode==="log")openAmount(item,{mode:"log",meal,k:day,onDone:afterAdd});
-    else openAmount(item,{mode:"pick",onDone:x=>{onPick&&onPick(x);root.close()}});
+    if(mode==="log")openAmount(item,{mode:"log",meal,k:day,onDone:m=>afterAdd(m)});
+    else openAmount(grams>0?Object.assign({},item,{q:grams,u:"g"}):item,{mode:"pick",right,onDone:x=>{onPick&&onPick(x);root.close()}});
   }
   const itemRow=(item,right,small,sub)=>{
     const b=el("button","fr",`<span class="ft"><span class="fn">${esc(item.name)}</span>`+
@@ -1959,14 +2516,15 @@ function openPicker({meal="s",k,mode="log",exclude,title,onPick}={}){
   }
   render();
   loadUSDA().catch(()=>{});
-  setTimeout(()=>input.focus(),80);
+  /* With a query there are results to see, not a keyboard. */
+  if(!query)setTimeout(()=>input.focus(),80);
   return root;
 }
 
 /* ---- Amount: how much of one item ---- */
 /* right:"Done" for a sub-edit inside an editor that has its own Save. Only a
    new amount takes focus. */
-function openAmount(item,{mode="log",meal="s",k,entry,onDone,onRemove,right,focus=mode!=="edit"}={}){
+function openAmount(item,{mode="log",meal="s",k,entry,onDone,onRemove,right,title:t0,focus=mode!=="edit"}={}){
   const day=k||cur;
   let u=item.u||"g",q=item.q;
   if(q==null){
@@ -1977,7 +2535,7 @@ function openAmount(item,{mode="log",meal="s",k,entry,onDone,onRemove,right,focu
   if(unitGrams(item,u)==null){u="g";q=entry?entry.g:100}
   let m=entry?entry.m:meal;
   let inp,unitLbl,out;
-  const title=mode==="edit"?"Edit entry":mode==="pick"?(onRemove?"Edit item":"Amount"):MEAL_NAME[m]||"Add";
+  const title=t0||(mode==="edit"?"Edit entry":mode==="pick"?(onRemove?"Edit item":"Amount"):MEAL_NAME[m]||"Add");
   const root=sheet({title,left:"Cancel",right:right||(mode==="edit"?"Save":"Add"),onRight:()=>save(),build:(body,sh)=>{
     body.innerHTML=`<div class="fd-name">${esc(item.name)}</div>
       <div class="fd-src">${esc(item.src)} · ${per100Text(item.n)}</div>
@@ -2092,15 +2650,18 @@ const LABEL_FIELDS=[["Calories","kcal",0,"kcal"],["Protein","protein",NI.protein
 function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
   const f=food||{};const mine=!food||f.mine;
   const serving0=(f.portions||[]).find(p=>/^1 serving/.test(p[0]));
-  let basis="100";
+  let basis="100",seg=null,gone=false,extra=[],extraCode="";
   let snap0=null;
-  const snapOf=()=>JSON.stringify([...root.body.querySelectorAll("input")].map(i=>i.value).concat(basis));
+  /* Inputs by position: name, brand, barcode, serving, then LABEL_FIELDS. */
+  const inputs=()=>[...root.body.querySelectorAll("input")];
+  const snapOf=()=>JSON.stringify(inputs().map(i=>i.value).concat(basis));
   const root=sheet({title:food?(mine?"Edit food":"Food"):"New food",left:mine?"Cancel":"",right:mine?(food?"Save":"Add"):"Done",tall:true,
     dirty:()=>mine&&snap0!==null&&snapOf()!==snap0,
     onRight:()=>mine?save():undefined,build:(body,sh)=>{
     const n=f.n||[];
     const val=(i,key)=>n[i]==null?"":key==="salt"?Math.round(n[i]/400*100)/100:n[i];
-    body.innerHTML=`<div class="card">
+    body.innerHTML=(mine?`<button class="btn ghost ico" type="button" data-label style="margin:2px 0 12px">${CAM_SVG}<span>Read the label</span></button>`:"")+
+      `<div class="card">
         ${fieldRow("Name",{value:f.name||name||"",placeholder:"Required",mode:"",left:false})}
         ${fieldRow("Brand",{value:f.brand||brand||"",placeholder:"Optional",mode:""})}
         ${fieldRow("Barcode",{value:f.barcode||barcode||"",placeholder:"Optional",mode:"numeric"})}
@@ -2112,7 +2673,7 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
       <p class="foot">${mine?"Foods you add are shared with everyone in the group, so a product only has to be typed in once. Your diary stays private.":"Added by someone else in the group, so only they can change it."}</p>`;
     /* The toggle converts what is on screen, so a food never changes by being
        re-read. Per serving needs the serving size to convert with. */
-    const seg=makeSeg([["100","Per 100 g"],["serving","Per serving"]],basis,v=>{
+    seg=makeSeg([["100","Per 100 g"],["serving","Per serving"]],basis,v=>{
       if(v===basis)return;
       const ins=[...body.querySelectorAll("input")],sv=num(ins[3].value),vals=ins.slice(4);
       if(vals.some(i=>num(i.value)!=null)){
@@ -2126,6 +2687,14 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
     /* Someone else's food is read-only, and stored values are always per 100 g. */
     if(!mine){body.querySelectorAll("input").forEach(i=>i.disabled=true);body.querySelector("[data-basis]").remove();
       body.querySelector(".shdr .t").textContent="Nutrition per 100 g"}
+    else{
+      /* The barcode field stays for typing; the button beside it scans. */
+      const sb=el("button","fscan",SCAN_SVG.replace('width="26" height="26"','width="24" height="24"'));
+      sb.type="button";sb.setAttribute("aria-label","Scan a barcode");
+      sb.onclick=()=>{haptic();openScanner(gotCode)};
+      body.querySelectorAll("input")[2].parentElement.appendChild(sb);
+      body.querySelector("[data-label]").onclick=()=>{if(aiGateNow("label"))pickPhoto(readLabel)};
+    }
     selectOnFocus(body);formKeys(body,sh.submit);
     const log=el("button","btn ghost","Log it");
     if(food&&live(food)){
@@ -2143,6 +2712,101 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
   }});
   paintIn(root);
   snap0=snapOf();
+  root.onClosed=()=>{gone=true};
+  /* So Read the label knows whether AI is on by the time it is tapped. */
+  if(mine&&S.key&&navigator.onLine!==false&&aiStale())aiStatus();
+  /* A scanned code: if the group already has that product, say so; else ask
+     Open Food Facts and fill only what is still empty. */
+  async function gotCode(code){
+    if(gone)return;
+    const ins=inputs(),bc=ins[2],prev=bc.value;
+    bc.value=code;
+    const known=Object.values(S.foods).find(x=>live(x)&&x.barcode===code&&x.id!==f.id);
+    if(known){
+      /* Adding from a picker, the food it already is goes straight on to its
+         amount, as a scan in the picker does. Elsewhere it opens. */
+      const use=!food&&!!onSaved;
+      const go=await alertBox({title:"Already added",message:`${foodItem(known).name} has this barcode.`,
+        actions:[{label:"Cancel",style:"cancel",value:false},{label:use?"Use it":"Open it",value:true}]});
+      /* Two foods cannot share a code, so it does not stay in this one. */
+      bc.value=prev;
+      if(go!==true||gone)return;
+      /* Anything typed here is not lost without asking. Opening stacks the
+         other food over this one instead, so there is nothing to ask. */
+      const typed=snapOf()!==snap0;
+      if(use){
+        if(typed&&await alertBox({title:"Discard changes?",actions:[{label:"Keep Editing",style:"cancel",value:false},
+          {label:"Discard",style:"destructive",value:true}]})!==true)return;
+        if(gone)return;
+        root.close();setTimeout(()=>onSaved(known),300);
+      }
+      else if(!food&&!typed){root.close();setTimeout(()=>openFoodEditor(known),300)}
+      else openFoodEditor(known);
+      return;
+    }
+    /* The lookup and a label being read would both fill the same fields. */
+    const sb=root.body.querySelector(".fscan"),rl=root.body.querySelector("[data-label]");
+    sb.disabled=true;if(rl)rl.disabled=true;
+    const hide=hud("Looking it up…",SEARCH_SVG.replace('width="16" height="16"','width="34" height="34"'),{hold:true});
+    let p=null;
+    try{p=await offLookup(code)}catch(e){}finally{hide();sb.disabled=false;if(rl)rl.disabled=false}
+    if(gone||!p||bc.value!==code)return;
+    if(fillFromOFF(offToFood(code,p)))hud("Filled in from Open Food Facts");
+  }
+  function fillFromOFF(o){
+    const ins=inputs();let did=false;
+    const put=(i,v)=>{if(v!=null&&v!==""&&!ins[i].value.trim()){ins[i].value=String(v);did=true}};
+    if(o.name&&!/^Product \d+$/.test(o.name))put(0,o.name);
+    put(1,o.brand);
+    if(o.partial)return did;
+    const sv=(o.portions||[]).find(p=>/^1 serving/.test(p[0]));
+    if(sv)put(3,Math.round(sv[1]*10)/10);
+    /* Its values are per 100 g. An empty form switches to that; one with
+       numbers per serving takes them converted, if the serving is known. */
+    const vals=ins.slice(4);
+    if(basis!=="100"&&vals.every(i=>!i.value.trim())){basis="100";segSet(seg,"100")}
+    const sg=num(ins[3].value),k=basis==="100"?1:sg>0?sg/100:null;
+    if(k!=null)LABEL_FIELDS.forEach(([,key,i],j)=>{const v=o.n[i];if(v!=null)put(4+j,Math.round((key==="salt"?v/400:v)*k*100)/100)});
+    extra=(o.portions||[]).filter(p=>!/^1 serving/.test(p[0]));extraCode=o.barcode;
+    return did;
+  }
+  /* A photo of the label, read by the model. Name and brand only fill when
+     empty; the numbers are what the label says, so they replace. */
+  async function readLabel(file){
+    if(gone)return;
+    const btn=root.body.querySelector("[data-label]"),sb=root.body.querySelector(".fscan");
+    btn.disabled=true;btn.lastChild.textContent="Reading…";if(sb)sb.disabled=true;
+    const hide=hud("Reading the label…",SPIN,{hold:true});
+    let j=null,err=null;
+    try{
+      let image;try{image=await jpegBase64(file)}catch(e){throw aiErr("bad_image")}
+      j=await aiCall("label",{image});
+    }catch(e){err=e}
+    hide();
+    if(gone)return;
+    btn.disabled=false;btn.lastChild.textContent="Read the label";if(sb)sb.disabled=false;
+    if(err)return aiExplain(err,{kind:"label"});
+    if(!j||!j.found)return tellUser("That doesn’t look like a nutrition label","Take the photo straight on, with the nutrition table filling most of the frame.");
+    const ins=inputs(),str=v=>typeof v==="string"?v.trim().slice(0,80):"";
+    if(!ins[0].value.trim()&&str(j.name))ins[0].value=str(j.name);
+    if(!ins[1].value.trim()&&str(j.brand))ins[1].value=str(j.brand);
+    const nb=j.basis==="serving"?"serving":"100",sg=aiNum(j.serving_grams,0,5000);
+    if(sg>0)ins[3].value=String(Math.round(sg*10)/10);
+    const v={kcal:j.kcal,protein:j.protein,carbs:j.carbs,sugar:j.sugar,fat:j.fat,satfat:j.satfat,fiber:j.fiber,salt:j.salt};
+    LABEL_FIELDS.forEach(([,key],i)=>{
+      const x=v[key];
+      if(typeof x==="number"&&isFinite(x)&&x>=0)ins[4+i].value=String(Math.round(x*100)/100);
+      /* A number typed for the other basis would now read wrong. */
+      else if(nb!==basis)ins[4+i].value="";
+    });
+    basis=nb;segSet(seg,basis);
+    /* The note is what to check: a per 100 ml table, a value converted from
+       kJ or sodium, digits that were hard to read. */
+    const note=typeof j.note==="string"?j.note.trim().slice(0,200):"";
+    if(note){await tellUser("Filled in — check the numbers",note);if(gone)return}
+    if(basis==="serving"&&!(num(ins[3].value)>0)){hud("Add the serving size",WARN);ins[3].focus();return}
+    if(!note)hud("Filled in — check the numbers");
+  }
   function save(){
     const ins=[...root.body.querySelectorAll("input")];
     const nm=ins[0].value.trim(),br=ins[1].value.trim(),bc=ins[2].value.replace(/\D/g,"");
@@ -2163,6 +2827,8 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
     const clash=bc&&Object.values(S.foods).find(x=>live(x)&&x.barcode===bc&&x.id!==f.id);
     if(clash){hud(`That barcode is already ${clash.name}`,WARN);ins[2].focus();return false}
     const portions=(f.portions||[]).filter(p=>!/^1 serving/.test(p[0]));
+    /* A pack size from Open Food Facts, while the code it came with stays. */
+    if(bc&&bc===extraCode)for(const p of extra)if(!portions.some(x=>x[0]===p[0]))portions.push(p);
     if(sv>0)portions.unshift([`1 serving (${fmtN(sv,1)} g)`,sv]);
     const out=Object.assign({},f,{id:f.id||(bc&&!S.foods["b"+bc]?"b"+bc:uid()),name:nm,brand:br,barcode:bc||"",n,portions,
       src:f.src||"user",mine:true,t:now()});
@@ -2177,7 +2843,9 @@ const guessMeal=()=>{const h=new Date().getHours();return h<11?"b":h<15?"l":h<21
 /* ---- Recipes and saved meals share one editor: a list of items ----
    A recipe is cooked and portioned: weigh the finished pot and log grams of it.
    A saved meal is a set of things eaten together, logged in one tap. */
-function openListEditor(kind,src){
+/* prefill {j,rows}: a description's reply, matched; the editor opens with it
+   and counts as changed. onSaved runs after a save. */
+function openListEditor(kind,src,{prefill,onSaved}={}){
   const isR=kind==="recipe";
   const store=isR?S.meta.recipes:S.meta.meals;
   const r=src?JSON.parse(JSON.stringify(src)):{id:uid(),name:"",items:[]};
@@ -2189,6 +2857,7 @@ function openListEditor(kind,src){
     body.innerHTML=`<div class="card">${fieldRow("Name",{value:r.name,placeholder:isR?"e.g. Chilli con carne":"e.g. Usual breakfast",mode:""})}</div>
       <div class="shdr"><h2 class="t">${isR?"Ingredients":"Items"}</h2><span class="x" data-raw></span></div>
       <div class="card" data-items></div>
+      <p class="foot hidden" data-ainote role="status"></p>
       ${isR?`<div class="shdr"><h2 class="t">Finished dish</h2></div>
       <div class="card">${fieldRow("Cooked weight",{value:r.cooked||"",unit:"g",placeholder:"Optional"})}
         ${fieldRow("Servings",{value:r.serv||"",unit:"",placeholder:"Optional"})}</div>
@@ -2221,6 +2890,31 @@ function openListEditor(kind,src){
   /* Taken once the sheet is built, so an untouched recipe closes quietly. */
   const snap=()=>JSON.stringify([nameIn.value.trim(),r.items,isR?num(cookedIn.value):0,isR?num(servIn.value):0]);
   const snap0=snap();
+  /* A reply's note says what to check (an assumed tin size, an unsure
+     ingredient); it stays under the list while the editor is open. */
+  const notes=[];
+  /* After the snapshot, so a prefilled editor asks before discarding. */
+  if(prefill)addDescribed(prefill.j,prefill.rows,true);
+  /* Described items join the list; a name, servings or cooked weight that
+     was said fills only an empty field. */
+  function addDescribed(j,rows,quiet){
+    for(const x of rows)r.items.push({id:uid(),name:x.name,ref:x.ref,n:x.n,g:x.g,q:x.q,u:x.u});
+    const nt=typeof j.note==="string"?j.note.trim().slice(0,200):"";
+    if(nt&&!notes.includes(nt)){
+      notes.push(nt);
+      const fn=root.body.querySelector("[data-ainote]");
+      fn.textContent=notes.join(" ");fn.classList.remove("hidden");
+    }
+    const nm=typeof j.name==="string"?j.name.trim().slice(0,80):"";
+    if(!nameIn.value.trim()&&nm)nameIn.value=nm;
+    if(isR){
+      if(!(num(cookedIn.value)>0)&&aiNum(j.cooked_grams,0,20000)>0)cookedIn.value=String(Math.round(j.cooked_grams));
+      if(!(num(servIn.value)>0)&&aiNum(j.servings,0,100)>0)servIn.value=String(Math.max(1,Math.round(j.servings)));
+      r.cooked=num(cookedIn.value);r.serv=num(servIn.value);
+    }
+    draw();
+    if(!quiet)hud(`Added ${rows.length} ${isR?"ingredient":"item"}${rows.length===1?"":"s"}`);
+  }
   function draw(){
     itemsCard.innerHTML="";
     r.items.forEach((x,i)=>{
@@ -2235,7 +2929,12 @@ function openListEditor(kind,src){
     add.type="button";
     add.onclick=()=>openPicker({mode:"pick",exclude:r.id,title:isR?"Add an ingredient":"Add an item",
       onPick:y=>{r.items.push(Object.assign({id:uid()},y));draw()}});
-    itemsCard.appendChild(add);
+    /* Opens the same sheet as the Foods tab, titled as there: "Describe
+       ingredients" would not fit the title at 320. */
+    const say=el("button","cell addrow",`${WAVE_SM}<span class="cl">${isR?"Describe ingredients":"Describe items"}</span>`);
+    say.type="button";
+    say.onclick=()=>aiGate().then(ok=>{if(ok)openDescribe({task:kind,exclude:r.id,into:(j,rows)=>addDescribed(j,rows)})});
+    itemsCard.append(add,say);
     drawSum();
   }
   function drawSum(){
@@ -2258,6 +2957,7 @@ function openListEditor(kind,src){
     if(!r.items.length){hud(isR?"Add an ingredient":"Add an item",WARN);return false}
     if(isR){r.cooked=num(cookedIn.value)||null;r.serv=num(servIn.value)||null}
     r.t=now();store[r.id]=r;dirtyMeta();renderAll();if(!quiet)hud("Saved");
+    onSaved&&onSaved(r);
   }
   return root;
 }
@@ -2429,19 +3129,22 @@ function renderFoods(){
   const list=$("libList");list.innerHTML="";
   let count=0;
   if(libTab==="foods"){
-    const foods=Object.values(S.foods).filter(f=>live(f)&&match(f.name+" "+(f.brand||"")))
-      .sort((a,b)=>(b.mine-a.mine)||a.name.localeCompare(b.name));
+    /* Only the foods this person added. The group's foods still turn up when
+       searching to log something, which is what sharing them is for. */
+    const foods=Object.values(S.foods).filter(f=>live(f)&&f.mine&&match(f.name+" "+(f.brand||"")))
+      .sort((a,b)=>a.name.localeCompare(b.name));
     count=foods.length;
     for(const f of foods.slice(0,300)){
-      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(f.name)}</span><span class="fs">`+
-        `<span class="tag${f.mine?" me":""}">${f.mine?"YOU":"GROUP"}</span>${esc([f.brand,f.barcode?"barcode":""].filter(Boolean).join(" · "))}</span></span>`+
+      const sub=[f.brand,f.src==="off"?"Scanned":f.barcode?"Barcode":""].filter(Boolean).join(" · ");
+      const b=el("button","fr",`<span class="ft"><span class="fn">${esc(f.name)}</span>`+(sub?`<span class="fs">${esc(sub)}</span>`:"")+`</span>`+
         `<span class="fk">${kc(f.n&&f.n[0])}<small>per 100 g</small></span>${CHEV}`);
-      b.type="button";b.onclick=()=>openFoodEditor(f);
-      list.appendChild(b);
+      b.type="button";
+      list.appendChild(libRow(b,"food",f));
     }
-    $("libFoot").textContent=count?"Foods anyone in the group adds or scans appear here for everyone. Diaries, recipes and meals stay private.":
-      "Foods you add or scan land here, and are shared with the group so each product only needs typing in once. The USDA database is searched when you add food.";
+    $("libFoot").textContent=count?"Foods you add or scan. They also turn up in the group's search, so a product only needs adding once. Swipe left or press and hold a food to delete it.":
+      "Foods you add or scan land here. They also turn up in the group's search, so each product only needs typing in once. The USDA database is searched when you add food.";
     $("libNew").textContent="New food";
+    $("libDescribe").classList.add("hidden");
   }else{
     const isR=libTab==="recipes";
     const items=Object.values(isR?S.meta.recipes:S.meta.meals).filter(x=>live(x)&&match(x.name)).sort((a,b)=>a.name.localeCompare(b.name));
@@ -2452,14 +3155,47 @@ function renderFoods(){
         right=info.serving?kc(info.total/x.serv):kc(info.per100[0]);small=info.serving?"per serving":"per 100 g"}
       else{sub=x.items.map(i=>i.name.split(",")[0]).join(", ");right=kc(x.items.reduce((a,i)=>a+kcalOf(i),0));small="kcal"}
       const b=el("button","fr",`<span class="ft"><span class="fn">${esc(x.name)}</span><span class="fs">${esc(sub)}</span></span><span class="fk">${right}<small>${small}</small></span>${CHEV}`);
-      b.type="button";b.onclick=()=>isR?openRecipe(x):openMeal(x);
-      list.appendChild(b);
+      b.type="button";
+      list.appendChild(libRow(b,isR?"recipe":"meal",x));
     }
     $("libFoot").textContent=isR?"A recipe is something you cook and portion: add the ingredients, weigh the finished dish, then log grams of it.":
       "A saved meal is a set of foods you often eat together, logged in one tap. You can also save one from any meal in the diary.";
     $("libNew").textContent=isR?"New recipe":"New meal";
+    const d=$("libDescribe");d.classList.remove("hidden");
+    d.innerHTML=`${WAVE_SM}<span>${isR?"Describe a recipe":"Describe a meal"}</span>`;
   }
   if(!count)list.appendChild(el("p","empty",q?"Nothing matches.":libTab==="foods"?"No foods yet.":libTab==="recipes"?"No recipes yet.":"No saved meals yet."));
+}
+/* A library row: tap to open, swipe left to delete, press and hold for the
+   context menu. Deleting from here is the swipe convention: the reveal or the
+   menu is the confirmation, no alert. Each editor still has its own confirmed
+   Delete button for anyone who doesn't use gestures. */
+const MENU_ICON={
+  log:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.6"/><path d="M12 8v8M8 12h8"/></svg>',
+  edit:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15.6 4.6 19.4 8.4 9 18.8l-4.6.8.8-4.6z"/><path d="m13.4 6.8 3.8 3.8"/></svg>',
+  del:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 6.5h15M9.5 6.5V4.8h5v1.7M6.6 6.5l.9 12.8a1.4 1.4 0 0 0 1.4 1.3h6.2a1.4 1.4 0 0 0 1.4-1.3l.9-12.8M10.2 10.5v6.2M13.8 10.5v6.2"/></svg>'};
+function libDelete(kind,x){
+  if(kind==="food"){S.foods[x.id]=Object.assign({},x,{del:1,t:now()});dirtyFood(x.id)}
+  else{(kind==="recipe"?S.meta.recipes:S.meta.meals)[x.id]={id:x.id,del:1,t:now()};dirtyMeta()}
+  renderAll();hud("Deleted");
+}
+const libOpen=(kind,x)=>kind==="food"?openFoodEditor(x):kind==="recipe"?openRecipe(x):openMeal(x);
+function libLog(kind,x,anchor){
+  const done=m=>hud(`Added to ${MEAL_NAME[m]}`);
+  if(kind==="food")return openAmount(foodItem(x),{mode:"log",meal:guessMeal(),k:todayKey(),onDone:done});
+  if(kind==="recipe")return openAmount(recipeItem(x),{mode:"log",meal:guessMeal(),k:todayKey(),onDone:done});
+  menu(anchor,MEALS.map(([v,t])=>({label:`Add to ${t}`,onSelect:()=>{logMeal(x,todayKey(),v);renderAll();hud(`Added to ${t}`)}})));
+}
+function libRow(inner,kind,x){
+  const row=swipeRow(inner,()=>libOpen(kind,x),()=>libDelete(kind,x));
+  row.classList.add("hold");
+  longPress(row,()=>menu(inner,[
+    {title:x.name},
+    {label:kind==="food"?"Log it":kind==="recipe"?"Log a portion":"Log this meal",icon:MENU_ICON.log,onSelect:()=>libLog(kind,x,inner)},
+    {label:"Edit",icon:MENU_ICON.edit,onSelect:()=>libOpen(kind,x)},
+    {separator:true},
+    {label:"Delete",icon:MENU_ICON.del,destructive:true,onSelect:()=>libDelete(kind,x)}],{dim:true}));
+  return row;
 }
 $("libSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;haptic();libTab=b.dataset.v;renderFoods()});
 $("libSearch").addEventListener("input",()=>{$("libClear").classList.toggle("hidden",!$("libSearch").value);renderFoods()});
@@ -2469,6 +3205,10 @@ $("libNew").addEventListener("click",()=>{
   if(libTab==="foods")openFoodEditor(null,{});
   else if(libTab==="recipes")openRecipe(null);
   else openMeal(null);
+});
+$("libDescribe").addEventListener("click",()=>{
+  const task=libTab==="recipes"?"recipe":"meal";
+  aiGate().then(ok=>{if(ok)openDescribe({task})});
 });
 
 /* ==========================================================================
@@ -2553,10 +3293,14 @@ function renderProgress(){
   }
 
   const pAvg=done.length?done.reduce((a,d)=>a+d.p,0)/done.length:null;
+  /* The scale and the diary's answer once there is enough of both; until
+     then the formula's, with what is still missing. */
+  const mb=measuredBurn(end);
   const tiles=[
     ["Average protein",pAvg==null?"–":`${fmtN(Math.round(pAvg))}<small> g</small>`,p?`target ${fmtN(p.protein)} g`:""],
     ["Days logged",`${logged.length}<small> / ${range}</small>`,"days with any food"],
-    ["Estimated burn",p?`${kc(p.tdee)}<small> kcal</small>`:"–","from your profile"],
+    mb.kcal?["Measured burn",`${kc(mb.kcal)}<small> kcal</small>`,`from ${mb.days} days`]:
+      ["Estimated burn",p?`${kc(p.formula)}<small> kcal</small>`:"–",esc(mb.need)],
     ["Weigh-ins",String(ws.length),ws.length?`last ${esc(fmt(ws[ws.length-1].k,{day:"numeric",month:"short",...yearIf(ws[ws.length-1].k)}))}`:"none in this period"]];
   $("progTiles").innerHTML=tiles.map(([a,b,c])=>`<div class="tile"><span>${a}</span><b>${b}</b><small class="s">${c}</small></div>`).join("");
 
@@ -2694,12 +3438,14 @@ function profileForm(init){
     pd.textContent=d.type==="maintain"?"Eat what you burn. Good for building muscle slowly while staying lean.":
       `Aims to ${d.type==="lose"?"lose":"gain"} ${fmtN(Math.abs(r)*100,2)}% of your weight a week — about ${fmtN(Math.abs(r)*d.kg,2)} kg.`+
       (d.type==="gain"?" Gaining faster than this mostly adds fat.":"");
-    res.innerHTML=`<div class="tile"><span>You burn about</span><b>${kc(pl.tdee)}<small> kcal</small></b><small class="s">${kc(pl.bmr)} at rest</small></div>
+    const meas=pl.burn==="measured";
+    res.innerHTML=`<div class="tile"><span>You burn about</span><b>${kc(pl.tdee)}<small> kcal</small></b><small class="s">${meas?"measured":`${kc(pl.bmr)} at rest`}</small></div>
       <div class="tile"><span>Eat</span><b>${kc(pl.kcal)}<small> kcal</small></b><small class="s">a day</small></div>`;
     note.textContent=`Protein ${pl.protein} g · Carbs ${pl.carbs} g · Fat ${pl.fat} g. `+
       (pl.limited?`That is as low as it goes: below what you burn at rest it stops being sensible, so this ${paceText(pl.weekly)} rather than the pace asked for.`:
         `At ${kc(pl.kcal)} kcal a day this ${paceText(pl.weekly)}.`)+
-      " It is an estimate — your weight trend over the first few weeks shows the truth.";
+      (meas?` Your burn is measured from ${pl.measured.days} days of your diary and weigh-ins, as chosen under Base targets on.`:
+        " It is an estimate — your weight trend over the first few weeks shows the truth.");
     if(node.onValid)node.onValid(true);
   }
   node.valid=valid;node.value=value;node.refresh=upd;node.problem=problem;
@@ -2776,9 +3522,18 @@ function renderMe(){
   if(!p){$("targetCard").innerHTML="";return}
   $("targetCard").innerHTML=[["Calories",`${kc(p.kcal)} kcal`],["Protein",`${p.protein} g`],["Carbs",`${p.carbs} g`],["Fat",`${p.fat} g`]]
     .map(([a,b])=>`<div class="cell"><span class="cl">${a}</span><span class="cv">${b}</span></div>`).join("");
-  $("targetFoot").textContent=`You burn about ${kc(p.tdee)} kcal a day (${kc(p.bmr)} at rest), based on ${fmtN(p.kg,1)} kg. `+
+  /* Says which burn the targets start from, and why when it is not the one
+     chosen. */
+  const mb=p.measured,held=p.burn==="measured"&&Math.round(p.tdee)!==Math.round(mb.kcal);
+  const burnText=p.burn==="measured"?
+    `You burn about ${kc(p.tdee)} kcal a day, measured from ${mb.days} days of your diary and weigh-ins`+
+      (held?` (${kc(mb.kcal)}, held within a quarter of the formula’s ${kc(p.formula)})`:"")+". ":
+    `You burn about ${kc(p.tdee)} kcal a day (${kc(p.bmr)} at rest), from the formula and ${fmtN(p.kg,1)} kg`+
+      (mb&&mb.need?`, until there is enough to measure it: ${mb.need.toLowerCase()}`:"")+". ";
+  $("targetFoot").textContent=burnText+
     `Eating ${kc(p.kcal)} ${paceText(p.weekly)}.`+(p.limited?" Your goal asked for a faster pace, but the target stops at what you burn at rest.":"")+
     (p.custom?" You have set a custom calorie target.":"");
+  $("burnVal").textContent=S.meta.burn&&S.meta.burn.mode==="measured"?"Measured":"Formula";
   $("goalVal").textContent=goalText(S.meta.goal);
   const c=S.meta.custom||{};
   $("customVal").textContent=c.kcal||c.protein?"Custom":"Recommended";
@@ -2788,6 +3543,16 @@ function renderMe(){
 }
 $("editProfile").addEventListener("click",openProfileSheet);
 $("editTargets").addEventListener("click",openTargetsSheet);
+/* Measured burn stays in the menu before there is enough data, greyed, with
+   what is still needed as its detail. */
+$("burnRow").addEventListener("click",e=>{
+  const mode=S.meta.burn&&S.meta.burn.mode==="measured"?"measured":"formula",mb=measuredBurn(todayKey());
+  const set=v=>{if(v===mode)return;S.meta.burn={mode:v,t:now()};dirtyMeta();renderAll()};
+  menu(e.currentTarget,[
+    {label:"Formula",detail:"Your profile and activity level",selected:mode==="formula",onSelect:()=>set("formula")},
+    {label:"Measured burn",detail:mb.kcal?`${kc(mb.kcal)} kcal a day, from ${mb.days} days`:`Not yet: ${mb.need.toLowerCase()}`,
+      selected:mode==="measured",disabled:!mb.kcal&&mode!=="measured",onSelect:()=>set("measured")}]);
+});
 $("themeRow").addEventListener("click",e=>menu(e.currentTarget,THEMES.map(([k,label])=>({label,selected:(S.meta.theme||"auto")===k,
   onSelect:()=>{S.meta.theme=k;applyTheme();saveLocal();renderMe();allSegs().forEach(paintSeg)}}))));
 $("dataRow").addEventListener("click",openDataSheet);
@@ -2859,15 +3624,20 @@ async function openDataSheet(){
         ["Server copy",!S.key?"Not joined":lastSyncOk===false?"Offline":"On"],
         ["Last synced",last===null?"Never":last<1?"Just now":last<60?`${last} min ago`:last<1440?`${Math.round(last/60)} h ago`:`${Math.round(last/1440)} days ago`],
         ["Waiting to sync",pending?String(pending):"Nothing"],
+        ["AI logging",aiText()],
         ["Kept on this phone",persisted===true?"Protected":persisted===false?"Best effort":"Unknown"],
         ["Opened from home screen",isInstalled()?"Yes":"No"],
         ["Size of your data",fmtBytes(bytes)],
         ["Last backup",ago(daysSinceBackup())]];
-      return rows.map(([k,v])=>`<div class="cell"><span class="cl">${esc(k)}</span><span class="cv">${esc(v)}</span></div>`).join("");
+      return rows.map(([k,v])=>`<div class="cell${k==="AI logging"?" wrapv":""}"><span class="cl">${esc(k)}</span><span class="cv">${esc(v)}</span></div>`).join("");
     };
     const card=el("div","card");
     card.innerHTML=rowsHtml();
     body.appendChild(card);
+    /* The AI row follows a status check made now; it never counts as use. */
+    const redraw=()=>{if(card.isConnected)card.innerHTML=rowsHtml()};
+    aiWatch.add(redraw);root.onClosed=()=>aiWatch.delete(redraw);
+    if(S.key&&navigator.onLine!==false)aiStatus();
     if(isIOS()&&!isInstalled())body.appendChild(el("div","note",
       "<b>This is open in a browser tab, not the installed app.</b> On iPhone a tab’s storage can be cleared after about a week without a visit. "+
       "Open this page in <b>Safari</b>, tap Share, then <b>Add to Home Screen</b>, and use the icon. Your synced data follows."));
@@ -3027,11 +3797,16 @@ $("nutriRow").addEventListener("click",()=>openNutrition(cur));
 /* The day can tick over while the app sits open; the other phone may have
    changed things too. */
 let seenDay=todayKey();
-addEventListener("visibilitychange",()=>{
+/* On document, where the browser fires it. */
+document.addEventListener("visibilitychange",()=>{
   if(document.hidden)return;
   if(todayKey()!==seenDay){if(cur===seenDay)cur=todayKey();seenDay=todayKey()}
   renderAll();
   if(S.key)syncNow();
+  /* An installed app resumes for days without relaunching: AI that was off
+     (or used up) is asked again, so a key added since takes effect. The
+     check is free, and the sync above goes out on every return anyway. */
+  if(S.key&&navigator.onLine!==false&&(aiState!=="on"||aiSpent()))aiStatus();
 });
 addEventListener("online",()=>{if(S.key)syncNow()});
 

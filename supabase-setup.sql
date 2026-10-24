@@ -230,3 +230,88 @@ grant execute on function public.cal_join(text, text)                to anon;
 grant execute on function public.cal_leave(text)                     to anon;
 grant execute on function public.cal_pull(text, timestamptz)         to anon;
 grant execute on function public.cal_push(text, jsonb, jsonb, jsonb) to anon;
+
+-- ---------------------------------------------------------------------------
+-- AI usage. The cal-ai Edge Function (supabase/functions/cal-ai) counts every
+-- AI request here before it calls Claude, which is what puts a ceiling on the
+-- bill: PER_USER_DAILY requests per person per day, and GROUP_DAILY for
+-- everyone together. Days are the server's date (UTC). A status check never
+-- counts.
+-- ---------------------------------------------------------------------------
+create table if not exists public.cal_ai_usage (
+  key   text not null references public.cal_users(key) on delete cascade,
+  day   date not null,
+  count int  not null default 0,
+  primary key (key, day)
+);
+create index if not exists cal_ai_usage_day on public.cal_ai_usage (day);
+
+alter table public.cal_ai_usage enable row level security;
+revoke all on public.cal_ai_usage from anon, authenticated;
+-- no policies on purpose: nothing reaches this table directly
+
+create or replace function public.cal_ai_status(p_key text)
+  returns jsonb
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  per_user_daily constant int := 60;
+  v_used int;
+begin
+  if not exists (select 1 from cal_users where key = p_key) then
+    raise exception 'unknown key';
+  end if;
+  select u.count into v_used from cal_ai_usage u
+   where u.key = p_key and u.day = current_date;
+  return jsonb_build_object('used', coalesce(v_used, 0), 'limit', per_user_daily);
+end;
+$$;
+
+-- Counts one request, or refuses it. The limit travels in the exception's
+-- detail so the Edge Function can tell the app the number without keeping a
+-- second copy of it.
+create or replace function public.cal_ai_begin(p_key text)
+  returns jsonb
+  language plpgsql
+  security definer
+  set search_path = public
+as $$
+declare
+  per_user_daily constant int := 60;
+  group_daily    constant int := 600;
+  v_used  int;
+  v_group int;
+begin
+  if not exists (select 1 from cal_users where key = p_key) then
+    raise exception 'unknown key';
+  end if;
+  -- One request at a time, so two at once cannot both slip under a cap.
+  perform pg_advisory_xact_lock(hashtext('cal_ai_begin'));
+
+  select u.count into v_used from cal_ai_usage u
+   where u.key = p_key and u.day = current_date;
+  if coalesce(v_used, 0) >= per_user_daily then
+    raise exception 'daily limit' using detail = per_user_daily::text;
+  end if;
+  select coalesce(sum(u.count), 0) into v_group from cal_ai_usage u
+   where u.day = current_date;
+  if v_group >= group_daily then
+    raise exception 'group limit' using detail = group_daily::text;
+  end if;
+
+  insert into cal_ai_usage as u (key, day, count) values (p_key, current_date, 1)
+  on conflict (key, day) do update set count = u.count + 1
+  returning u.count into v_used;
+  return jsonb_build_object('used', v_used, 'limit', per_user_daily);
+end;
+$$;
+
+revoke all on function public.cal_ai_status(text) from public;
+revoke all on function public.cal_ai_begin(text)  from public;
+-- service_role (a secret key, or the legacy service-role key) is what the Edge
+-- Function calls with; anon (a publishable key, or the legacy anon key) is its
+-- fallback.
+grant execute on function public.cal_ai_status(text) to anon, service_role;
+grant execute on function public.cal_ai_begin(text)  to anon, service_role;
