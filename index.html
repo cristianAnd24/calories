@@ -160,6 +160,7 @@ main{max-width:560px;margin:0 auto;
 .shdr button.x .dots{color:var(--tint)}
 .shdr button.x:active{opacity:.4}
 .foot{font-size:13px;line-height:1.38;letter-spacing:-.006em;color:var(--lab2);margin:7px 20px 0}
+.foot.under-btn{margin:-4px 20px 14px}
 .note{font-size:13px;line-height:1.42;letter-spacing:-.006em;color:var(--lab);background:var(--gold-weak);
   border-radius:10px;padding:12px 14px;margin:12px 0 0}
 .note b{font-weight:600}
@@ -1947,23 +1948,39 @@ async function handleBarcode(code,onItem){
 }
 
 /* ==========================================================================
-   AI logging. A Supabase Edge Function (cal-ai) holds the Anthropic key and
-   counts each person's use; this page never sees a key. The model only ever
-   gets text or a photo, and nothing it says is saved until it is checked.
+   AI logging. A Supabase Edge Function (cal-ai) holds the AI key (Gemini or
+   Claude) and counts each person's use; this page never sees a key. The model
+   only ever gets text or a photo, and nothing it says is saved until it is
+   checked.
    ========================================================================== */
 const AI_URL=SB_URL+"/functions/v1/cal-ai";
 /* "unknown" until a status reply or an error says otherwise. aiAt is when a
    reply last said "on" or "off": an "off" older than AI_RECHECK is asked
-   again, since the owner may have added the key since. */
-let aiState="unknown",aiUse=null,aiLast=null,aiStatusP=null,aiChecked=false,aiAt=0;
+   again, since the owner may have added the key since. aiProv is the
+   provider the last reply named ("gemini", "claude" or ""): status always
+   names it, and so does every task reply once the server has chosen one.
+   Like the rest of this, it lasts for the session and is never stored. */
+let aiState="unknown",aiProv="",aiUse=null,aiLast=null,aiStatusP=null,aiChecked=false,aiAt=0;
 const AI_RECHECK=5*60000;
 const aiWatch=new Set();
+const AI_PROV_NAME={gemini:"Gemini",claude:"Claude"};
 /* The server counts by its own date, which is UTC. */
 const utcDay=()=>new Date().toISOString().slice(0,10);
-function aiSet(state,use){
+function aiSet(state,use,prov){
   if(state){aiState=state;aiAt=Date.now()}
   if(use)aiUse={used:use.used,limit:use.limit,day:utcDay()};
+  /* A server from before providers sends none: what is known stays. */
+  if(typeof prov==="string")aiProv=prov==="gemini"||prov==="claude"?prov:"";
   aiWatch.forEach(f=>{try{f()}catch(e){}});
+}
+/* On Gemini's free tier Google may use what is sent, so the sheets that send
+   something say so while the server says it is Gemini. It follows the status
+   check a sheet may still be waiting on; stop() when the sheet closes. */
+function aiProvNote(cls="foot"){
+  const p=el("p",cls,"Uses Google Gemini. On Gemini’s free tier, Google may review what you send and use it to improve its products.");
+  const sync=()=>p.classList.toggle("hidden",aiProv!=="gemini");
+  sync();aiWatch.add(sync);
+  return {el:p,stop:()=>aiWatch.delete(sync)};
 }
 const aiErr=(code,x)=>Object.assign(new Error(code),{code},x||{});
 const aiCount=j=>j&&typeof j.used==="number"&&j.used>=0&&j.limit>0?{used:j.used,limit:j.limit}:null;
@@ -1975,7 +1992,8 @@ function aiRead(r,txt){
   let j;try{j=JSON.parse(txt)}catch(e){j=null}
   if(r.status===404)throw aiErr("not_deployed");
   if(!j||typeof j!=="object")throw aiErr(r.ok||r.status>=500?"busy":"not_deployed");
-  if(!r.ok||j.error)throw aiErr(typeof j.error==="string"?j.error:r.status>=500?"busy":"not_deployed",{limit:j.limit,use:aiCount(j)});
+  if(!r.ok||j.error)throw aiErr(typeof j.error==="string"?j.error:r.status>=500?"busy":"not_deployed",
+    {limit:j.limit,use:aiCount(j),reason:j.reason,prov:j.provider});
   return j;
 }
 /* Resolves with the reply, or throws an Error whose .code is the server's
@@ -2008,7 +2026,7 @@ async function aiCall(task,payload,{ms=36000,signal}={}){
       const pj=aiRead(pr,ptxt);
       if(task!=="status"){
         /* The function answers, so the request itself was lost on the way. */
-        aiSet(pj.configured===false?"off":"on",aiCount(pj));
+        aiSet(pj.configured===false?"off":"on",aiCount(pj),pj.provider);
         throw aiErr(pj.configured===false?"not_configured":"busy",{use:aiCount(pj)});
       }
       r=pr;txt=ptxt;
@@ -2018,10 +2036,14 @@ async function aiCall(task,payload,{ms=36000,signal}={}){
     /* Stopped by the person: nothing was learned. */
     if(e.code==="cancelled")throw e;
     aiLast=e.code||"busy";
-    if(/^(not_configured|not_deployed|bad_key)$/.test(aiLast))aiSet("off");
-    else if(/^(daily|group)_limit$/.test(aiLast))aiSet("on",e.use||(aiLast==="daily_limit"&&e.limit>0?{used:e.limit,limit:e.limit}:null));
-    else aiSet(null,e.use);
-    /* The server counts a request that got as far as Claude, answered or
+    /* No key, or no function: no provider either. A rejected key keeps its
+       name. A reply that names the provider (any once the AI is chosen) says
+       where requests go, even if no status check has answered. */
+    if(/^(not_configured|not_deployed)$/.test(aiLast))aiSet("off",null,"");
+    else if(aiLast==="bad_key")aiSet("off",null,e.prov);
+    else if(/^(daily|group)_limit$/.test(aiLast))aiSet("on",e.use||(aiLast==="daily_limit"&&e.limit>0?{used:e.limit,limit:e.limit}:null),e.prov);
+    else aiSet(null,e.use,e.prov);
+    /* The server counts a request that got as far as the AI, answered or
        not. When the reply did not say the new count, ask for it, so the
        count shown is the server's. Not after bad_key: status would call a
        rejected key "configured" and turn AI back on. */
@@ -2030,8 +2052,14 @@ async function aiCall(task,payload,{ms=36000,signal}={}){
     throw e;
   }finally{clearTimeout(timer);if(signal)signal.removeEventListener("abort",stop)}
   aiLast=null;
-  if(task==="status")aiSet(j.configured?"on":"off",{used:Math.max(0,+j.used||0),limit:+j.limit||60});
-  else aiSet("on",aiCount(j)||(aiUse?{used:aiUse.used+1,limit:aiUse.limit}:null));
+  if(task==="status")aiSet(j.configured?"on":"off",{used:Math.max(0,+j.used||0),limit:+j.limit||60},j.configured?j.provider:"");
+  else{
+    aiSet("on",aiCount(j)||(aiUse?{used:aiUse.used+1,limit:aiUse.limit}:null),j.provider);
+    /* It worked, yet nothing has said which AI it was (a status check that
+       timed out, a server from before task replies named it): ask, so the
+       Gemini note shows from the next sheet on. Status is free. */
+    if(!aiProv)setTimeout(aiStatus,0);
+  }
   return j;
 }
 /* One status check at a time. It never counts towards the limit. */
@@ -2044,6 +2072,23 @@ function aiStatus(){
    a few minutes old. */
 const aiSpent=()=>aiState==="on"&&!!aiUse&&aiUse.limit>0&&aiUse.used>=aiUse.limit&&aiUse.day===utcDay();
 const aiStale=()=>aiState==="unknown"||((aiState==="off"||aiSpent())&&Date.now()-aiAt>AI_RECHECK);
+/* Gemini's free daily allowance comes back at midnight Pacific time. Said in
+   this phone's own time ("3:00 a.m." in Toronto, "1:00 a.m." in Calgary), since
+   the group is spread across time zones. */
+function aiQuotaBack(){
+  try{
+    const now=new Date(),p={};
+    new Intl.DateTimeFormat("en-US",{timeZone:"America/Los_Angeles",hourCycle:"h23",hour:"2-digit",minute:"2-digit",second:"2-digit"})
+      .formatToParts(now).forEach(x=>{p[x.type]=+x.value});
+    const back=new Date(now.getTime()-(((p.hour%24)*60+p.minute)*60+p.second)*1000-now.getMilliseconds()+864e5);
+    if(isNaN(back))throw 0;
+    if(!back.getHours()&&!back.getMinutes())return "It comes back at midnight.";
+    /* "3:00 a.m." on a 12-hour phone, "03:00" on a 24-hour one, never a bare "3:00". */
+    const o={hour:"numeric",minute:"2-digit"};
+    if(/^h2[34]$/.test(new Intl.DateTimeFormat([],o).resolvedOptions().hourCycle||""))o.hour="2-digit";
+    return `It comes back at ${back.toLocaleTimeString([],o)} (midnight Pacific time).`;
+  }catch(e){return "It comes back at midnight Pacific time."}
+}
 /* kind: "text" (a description), "list" (a recipe or meal), "photo", "label". */
 function aiExplain(e,{kind="text"}={}){
   const c=e&&e.code,pic=kind==="photo"||kind==="label";
@@ -2054,7 +2099,9 @@ function aiExplain(e,{kind="text"}={}){
     c==="offline"?["You’re offline",kind==="label"?"Reading a label needs a connection. You can still type the numbers in.":
       `${pic?"Reading a photo":"Describing food"} needs a connection. Search and quick add still work offline.`]:
     c==="timeout"?["That took too long","Try again in a moment."]:
-    c==="busy"?["Claude is busy","Try again in a moment."]:
+    c==="busy"&&e.reason==="quota"?["The free AI allowance is used up",
+      `Everyone in the group shares it. ${aiQuotaBack()} Search, scan and quick add work as usual.`]:
+    c==="busy"?["The AI is busy","Try again in a moment."]:
     c==="refused"||c==="unreadable"?["Couldn’t read that",
       kind==="label"?"Try a clearer photo of the nutrition table, straight on and in good light, or type the numbers in.":
       kind==="photo"?"Try a clearer photo, from above with the whole plate in it, or add the food by hand.":
@@ -2096,8 +2143,12 @@ function aiGateNow(kind="photo"){
   if(aiSpent()){aiExplain(aiErr("daily_limit",{limit:aiUse.limit}),{kind});return false}
   return true;
 }
-/* A status check that timed out met a slow server, not a missing network. */
-const aiText=()=>aiState==="on"?(aiUse?`On · ${fmtN(aiUse.used)} of ${fmtN(aiUse.limit)} today`:"On"):
+/* A status check that timed out met a slow server, not a missing network.
+   Where the row is too narrow it breaks only after the "·", so it reads
+   "On (Gemini) ·" / "12 of 60 today", never "…12 of 60" / "today". */
+const NBSP="\u00a0";
+const aiText=()=>aiState==="on"?(aiProv?`On${NBSP}(${AI_PROV_NAME[aiProv]})`:"On")+
+    (aiUse?`${NBSP}· ${fmtN(aiUse.used)}${NBSP}of${NBSP}${fmtN(aiUse.limit)}${NBSP}today`:""):
   aiState==="off"?"Off — no key on the server":aiStatusP?"Checking…":
   navigator.onLine===false||aiLast==="offline"?"Unknown (offline)":aiLast==="timeout"?"Unknown (no answer)":"Unknown";
 
@@ -2252,6 +2303,7 @@ const DESCRIBE={
 function openDescribe({task="log",meal=guessMeal(),k,exclude,into,onAdded}={}){
   const isLog=task==="log",kind=isLog?"text":"list",name=DESCRIBE[task][0];
   let ta,photo,busy=false,gone=false;
+  const prov=aiProvNote();
   const root=sheet({title:name,left:"Cancel",right:"Next",tall:true,
     dirty:()=>!gone&&!!ta.value.trim(),
     onRight:()=>{send();return false},
@@ -2262,7 +2314,7 @@ function openDescribe({task="log",meal=guessMeal(),k,exclude,into,onAdded}={}){
       /* Return is a new line here; Next is the bar button. */
       ta.addEventListener("input",()=>{grow();if(!busy)root.setRight("Next",!!ta.value.trim())});
       body.append(card,el("p","foot",(isLog?"":"Say what goes in and roughly how much. ")+
-        "Tap the microphone on the keyboard to speak. Nothing is saved until you check it."));
+        "Tap the microphone on the keyboard to speak. Nothing is saved until you check it."),prov.el);
       if(isLog){
         photo=el("button","btn ghost ico",`${CAM_SVG}<span>Use a photo</span>`);photo.type="button";
         photo.onclick=()=>{if(!busy&&aiGateNow())pickPhoto(sendPhoto)};
@@ -2274,7 +2326,7 @@ function openDescribe({task="log",meal=guessMeal(),k,exclude,into,onAdded}={}){
      that lands while "Discard changes?" is up waits for the answer: Keep
      Editing shows it, Discard drops it. */
   let ctl=null,held=null;
-  root.onClosed=()=>{gone=true;held=null;if(ctl)ctl.abort()};
+  root.onClosed=()=>{gone=true;held=null;prov.stop();if(ctl)ctl.abort()};
   root.onKept=()=>{const h=held;held=null;if(h)h()};
   setTimeout(()=>{if(!gone)ta.focus()},80);
   function grow(){ta.style.height="auto";ta.style.height=ta.scrollHeight+"px"}
@@ -2650,7 +2702,7 @@ const LABEL_FIELDS=[["Calories","kcal",0,"kcal"],["Protein","protein",NI.protein
 function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
   const f=food||{};const mine=!food||f.mine;
   const serving0=(f.portions||[]).find(p=>/^1 serving/.test(p[0]));
-  let basis="100",seg=null,gone=false,extra=[],extraCode="";
+  let basis="100",seg=null,gone=false,extra=[],extraCode="",prov=null;
   let snap0=null;
   /* Inputs by position: name, brand, barcode, serving, then LABEL_FIELDS. */
   const inputs=()=>[...root.body.querySelectorAll("input")];
@@ -2693,7 +2745,10 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
       sb.type="button";sb.setAttribute("aria-label","Scan a barcode");
       sb.onclick=()=>{haptic();openScanner(gotCode)};
       body.querySelectorAll("input")[2].parentElement.appendChild(sb);
-      body.querySelector("[data-label]").onclick=()=>{if(aiGateNow("label"))pickPhoto(readLabel)};
+      const rl=body.querySelector("[data-label]");
+      rl.onclick=()=>{if(aiGateNow("label"))pickPhoto(readLabel)};
+      /* Under the button it is about, before anything is sent. */
+      prov=aiProvNote("foot under-btn");rl.after(prov.el);
     }
     selectOnFocus(body);formKeys(body,sh.submit);
     const log=el("button","btn ghost","Log it");
@@ -2712,7 +2767,7 @@ function openFoodEditor(food,{barcode,name,brand,onSaved}={}){
   }});
   paintIn(root);
   snap0=snapOf();
-  root.onClosed=()=>{gone=true};
+  root.onClosed=()=>{gone=true;if(prov)prov.stop()};
   /* So Read the label knows whether AI is on by the time it is tapped. */
   if(mine&&S.key&&navigator.onLine!==false&&aiStale())aiStatus();
   /* A scanned code: if the group already has that product, say so; else ask

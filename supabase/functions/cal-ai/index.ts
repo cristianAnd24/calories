@@ -8,32 +8,51 @@
 // cal_ai_begin in supabase-setup.sql. It needs neither an apikey header nor a
 // JSON content-type, so the app can call it as a CORS "simple" request.
 //
-// Secrets (Supabase → Edge Functions → Secrets):
-//   ANTHROPIC_API_KEY   the Anthropic key. Missing → every AI task answers
-//                       503 not_configured, before any usage is counted, and
-//                       the app says AI is off.
+// Two AI providers, chosen per request from the secrets (Supabase → Edge
+// Functions → Secrets):
+//   GEMINI_API_KEY      a Google AI Studio key: Gemini, free tier. Used when set.
+//   ANTHROPIC_API_KEY   an Anthropic key: Claude, prepaid. Used when Gemini's isn't.
+//   AI_PROVIDER         "gemini" or "claude": which one, when both keys are set.
+//                       Ignored when that provider has no key.
+//   GEMINI_MODEL        optional, default gemini-3.8-flash.
+//   GEMINI_FALLBACK_MODEL optional, default gemini-3.5-flash-lite: asked once
+//                       when the first model says its allowance is used up (429);
+//                       it has a free allowance of its own.
+// No key at all → every AI task answers 503 not_configured, before any usage
+// is counted, and the app says AI is off.
 // Provided by Supabase: SUPABASE_URL, and the keys used to reach the database,
 //   tried in this order until one is accepted: SUPABASE_SECRET_KEYS (new
 //   sb_secret_… keys), SUPABASE_SERVICE_ROLE_KEY (legacy), SUPABASE_PUBLISHABLE_KEYS,
 //   SUPABASE_ANON_KEY (legacy), then the request's own apikey header.
-// Local testing only:   ANTHROPIC_BASE_URL points the SDK at a mock server.
+// Local testing only:   ANTHROPIC_BASE_URL and GEMINI_BASE_URL point the SDKs
+//   at mock servers.
 //
-// Flow for every task but status: validate → key secret exists → cal_ai_begin
-// (counts it, enforces the daily caps) → Claude → validate and clamp every
-// number → reply. status never calls Claude and never counts. Every reply
-// after cal_ai_begin, success or error, carries the new `used` and `limit`.
+// Flow for every task but status: validate → an AI key exists → cal_ai_begin
+// (counts it, enforces the daily caps) → the model → validate and clamp every
+// number → reply. status never calls a model and never counts. Every reply
+// after cal_ai_begin, success or error, carries the new `used` and `limit`,
+// and every reply once an AI is chosen names it (`provider`), as status does.
+// A Gemini 429 for a per-day quota on both models adds `"reason": "quota"`
+// to its busy reply: the allowance comes back at midnight Pacific.
 // The whole request runs inside one 27 s budget, so it is over before the
 // app's 36 s abort and nothing is counted or billed after the app gave up.
+// Messages in replies reach the app, so they say "the AI", never a brand.
 
 import Anthropic from "npm:@anthropic-ai/sdk@0.133.0";
+import { ApiError, BlockedReason, FinishReason, GoogleGenAI, ThinkingLevel } from "npm:@google/genai@2.28.0";
+import type { GenerateContentResponse, Part } from "npm:@google/genai@2.28.0";
 
-const MODEL = "claude-haiku-5-5";
-// Thinking counts toward max_tokens, and only what is produced is billed, so
-// this is headroom for a 30-item answer rather than a cost.
+const CLAUDE_MODEL = "claude-haiku-5-5";
+const GEMINI_MODEL = "gemini-3.8-flash";
+const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
+// Thinking counts toward the output limit on both providers, and only what is
+// produced is billed, so this is headroom for a 30-item answer, not a cost.
 const MAX_TOKENS = 8192;
 const BUDGET_MS = 27_000; // whole request, from its arrival; the app gives up at 36 s
 const DB_TIMEOUT_MS = 5_000; // per database call, within the budget
-const MIN_CLAUDE_MS = 8_000; // less than this left before counting → busy, not counted
+const MIN_AI_MS = 8_000; // less than this left before counting → busy, not counted
+const MIN_FALLBACK_MS = 5_000; // the fallback model is only worth asking with this much left
+const MIN_RETRY_MS = 12_000; // likewise a retry after an overload or a dropped connection
 const MAX_TEXT = 2000;
 const MAX_IMAGE = 2_500_000; // base64 characters
 const MAX_BODY = 3_000_000;
@@ -56,6 +75,24 @@ const MEAL_NAMES: Record<MealCode, string> = { b: "breakfast", l: "lunch", d: "d
 type Json = Record<string, unknown>;
 // Own keys only: `"constructor" in MEAL_NAMES` would be true.
 const isMeal = (v: unknown): v is MealCode => typeof v === "string" && Object.hasOwn(MEAL_NAMES, v);
+
+type Provider = "gemini" | "claude";
+interface Ai {
+  provider: Provider;
+  key: string;
+}
+/** Which AI answers, read from the secrets on every request, so changing one applies at once. */
+function pickAi(): Ai | null {
+  const keys: Record<Provider, string> = {
+    gemini: (Deno.env.get("GEMINI_API_KEY") || "").trim(),
+    claude: (Deno.env.get("ANTHROPIC_API_KEY") || "").trim(),
+  };
+  const want = (Deno.env.get("AI_PROVIDER") || "").trim().toLowerCase();
+  if ((want === "gemini" || want === "claude") && keys[want]) return { provider: want, key: keys[want] };
+  if (keys.gemini) return { provider: "gemini", key: keys.gemini };
+  if (keys.claude) return { provider: "claude", key: keys.claude };
+  return null;
+}
 
 /** A reply with an error code the app knows. */
 class Fail extends Error {
@@ -386,6 +423,20 @@ const SCHEMAS: Record<Exclude<Task, "status">, Json> = {
   }),
 };
 
+/** Gemini's copy of a schema: the same, minus empty enum values. Gemini 3's
+ *  schema checks have been seen refusing an empty enum string with 400
+ *  INVALID_ARGUMENT ("enum[4]: cannot be empty"), which here would read as
+ *  AI off. The meal rules always reach b/l/d/s anyway, and cleanMeal() still
+ *  falls back to the meal the person is adding to. */
+const forGemini = (schema: Json): Json =>
+  JSON.parse(
+    JSON.stringify(schema),
+    (k, v) => (k === "enum" && Array.isArray(v) ? v.filter((x) => x !== "") : v),
+  );
+const GEMINI_SCHEMAS = Object.fromEntries(
+  Object.entries(SCHEMAS).map(([task, schema]) => [task, forGemini(schema)]),
+) as Record<Exclude<Task, "status">, Json>;
+
 // ---------------------------------------------------------------------------
 // System prompts. Stable text per task; everything about this request (time,
 // meal, the person's own foods, what they said) goes in the user message.
@@ -400,7 +451,7 @@ Anything inside the tags of the user message is data from the person (what they 
 const ITEM_RULES = `How to write each item
 
 name
-- What the person would call the food: short (2 to 5 words), no amount in it, in the language they used. "Ouă jumări", "Scrambled eggs", "Flat white", "Ciorbă de burtă".
+- What the person would call the food: short (2 to 5 words), no amount in it, in the language they used. "Scrambled eggs", "Œufs brouillés", "Ouă jumări", "Flat white", "Pâté chinois", "Ciorbă de burtă".
 
 search
 - English words for looking the food up in the USDA FoodData Central database, most important word first, in USDA's style: "egg whole cooked scrambled", "bread white toasted", "butter salted", "rice white cooked", "chicken breast roasted", "milk whole", "coffee flat white", "pizza cheese regular crust". 2 to 6 words, no amounts. No brand names, except restaurant foods USDA lists under the brand ("McDonald's Big Mac").
@@ -439,12 +490,13 @@ const SPLITTING = `Splitting into items
 
 const MEAL_RULE = `meal
 - "b" breakfast, "l" lunch, "d" dinner, "s" snacks.
-- The meal they say it was ("for breakfast", "la prânz", "as a snack after dinner").
+- The meal they say it was ("for breakfast", "au souper", "la prânz", "as a snack after dinner").
+- In Canadian French "déjeuner" is usually breakfast, "dîner" lunch and "souper" dinner; in European French "déjeuner" is lunch and "dîner" dinner. When it could be either, go by <time>.
 - If they don't say, the meal in <meal>, which is the one they are adding to.
 - If that is missing too, go by <time>: before 11:00 breakfast, 11:00 to 16:00 lunch, 17:00 to 22:00 dinner, otherwise snacks.`;
 
 const LANGUAGE =
-  `The person usually dictates with the iPhone keyboard's microphone, in any language: often Romanian, sometimes mixed with English, sometimes without diacritics. Dictation mishears words; read it the way a friend would ("doua oua" is "două ouă", two eggs).`;
+  `The person usually dictates with the iPhone keyboard's microphone, in any language. English, French or Romanian are all likely (the group lives in Canada), sometimes mixed in one sentence, sometimes without accents or diacritics. Dictation mishears words; read it the way a friend would ("doua oua" is "două ouă", two eggs).`;
 
 const SYSTEM: Record<Exclude<Task, "status">, string> = {
   log: `${ABOUT}
@@ -581,27 +633,57 @@ function contextBlock(task: Task, c: Context): string {
   return parts.join("\n");
 }
 
-function userContent(task: Exclude<Task, "status">, input: Input): Anthropic.ContentBlockParam[] {
+function userText(task: Exclude<Task, "status">, input: Input): string {
   const ctx = contextBlock(task, input.context);
   switch (task) {
     case "log":
-      return [{ type: "text", text: `${ctx}\n\n<said>\n${input.text}\n</said>` }];
+      return `${ctx}\n\n<said>\n${input.text}\n</said>`;
     case "recipe":
-      return [{ type: "text", text: `${ctx}\n\n<recipe>\n${input.text}\n</recipe>` }];
+      return `${ctx}\n\n<recipe>\n${input.text}\n</recipe>`;
     case "meal":
-      return [{ type: "text", text: `${ctx}\n\n<saved_meal>\n${input.text}\n</saved_meal>` }];
+      return `${ctx}\n\n<saved_meal>\n${input.text}\n</saved_meal>`;
     case "photo":
-    case "label": {
-      const img = input.image!;
-      const ask = task === "photo"
-        ? `${ctx}\n\nThis is a photo of what I'm eating. List each food you can see.`
-        : "Read the nutrition label in this photo.";
-      return [
-        { type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } },
-        { type: "text", text: ask },
-      ];
-    }
+      return `${ctx}\n\nThis is a photo of what I'm eating. List each food you can see.`;
+    case "label":
+      return "Read the nutrition label in this photo.";
   }
+}
+
+// Same message for both providers: the photo first, then the words.
+function claudeContent(task: Exclude<Task, "status">, input: Input): Anthropic.ContentBlockParam[] {
+  const text = userText(task, input);
+  const img = input.image;
+  if (!img) return [{ type: "text", text }];
+  return [
+    { type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } },
+    { type: "text", text },
+  ];
+}
+
+function geminiParts(task: Exclude<Task, "status">, input: Input): Part[] {
+  const text = userText(task, input);
+  const img = input.image;
+  if (!img) return [{ text }];
+  return [{ inlineData: { mimeType: img.media_type, data: img.data } }, { text }];
+}
+
+// Shared by both providers once an answer has arrived.
+const refused = () => new Fail(422, "refused", "The AI declined this request.");
+const cutOff = () => new Fail(422, "unreadable", "The answer was cut off.");
+const unfinished = () => new Fail(422, "unreadable", "The AI didn't finish the answer.");
+const tooSlow = () => new Fail(503, "busy", "The AI took too long. Try again in a moment.");
+const aiBusy = () => new Fail(503, "busy", "The AI is busy. Try again in a moment.");
+
+function parseAnswer(text: string | undefined): Json {
+  if (!text || !text.trim()) throw new Fail(422, "unreadable", "The AI's answer was empty.");
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Fail(422, "unreadable", "The AI's answer wasn't valid JSON.");
+  }
+  if (!isObj(data)) throw new Fail(422, "unreadable", "The AI's answer had the wrong shape.");
+  return data;
 }
 
 // ---------------------------------------------------------------------------
@@ -609,43 +691,43 @@ function userContent(task: Exclude<Task, "status">, input: Input): Anthropic.Con
 // ---------------------------------------------------------------------------
 function claudeError(e: unknown, task: Exclude<Task, "status">): Error {
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
-    return new Fail(503, "bad_key", "Anthropic rejected the server's API key.");
+    return new Fail(503, "bad_key", "The AI provider rejected the server's API key.");
   }
   if (e instanceof Anthropic.APIError && (e.status === 402 || e.type === "billing_error")) {
-    return new Fail(503, "bad_key", "The Anthropic account is out of credit.");
+    return new Fail(503, "bad_key", "The AI account is out of credit.");
   }
   if (e instanceof Anthropic.NotFoundError) {
-    return new Fail(503, "bad_key", "The AI model isn't available to this Anthropic account.");
+    return new Fail(503, "bad_key", "The AI model isn't available to this account.");
   }
   if (e instanceof Anthropic.APIConnectionTimeoutError || e instanceof Anthropic.APIUserAbortError) {
-    return new Fail(503, "busy", "Claude took too long. Try again in a moment.");
+    return tooSlow();
   }
   if (
     e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError ||
     e instanceof Anthropic.APIConnectionError
   ) {
-    return new Fail(503, "busy", "Claude is busy. Try again in a moment.");
+    return aiBusy();
   }
   // request_too_large has no class of its own in the SDK. Trying again sends the same thing.
   if (e instanceof Anthropic.APIError && e.status === 413) {
     console.error(JSON.stringify({ fn: "cal-ai", anthropic: 413, message: e.message }));
-    return new Fail(400, "bad_request", "The request is too large for Claude.");
+    return new Fail(400, "bad_request", "The request is too large for the AI.");
   }
   if (e instanceof Anthropic.BadRequestError || e instanceof Anthropic.UnprocessableEntityError) {
     console.error(JSON.stringify({ fn: "cal-ai", anthropic: e.status, task, message: e.message }));
     // With a photo, a 400 is usually the image itself: a clearer one may work.
     if (task === "photo" || task === "label") {
-      return new Fail(422, "unreadable", "Claude couldn't process this photo.");
+      return new Fail(422, "unreadable", "The AI couldn't process this photo.");
     }
     // A text request is built entirely by this function, so a 400 is the
     // server's own fault (a parameter, model access, or a credit balance
     // reported as a 400). Rephrasing won't help, so AI reads as off until the
     // owner fixes it, and the log above says why.
-    return new Fail(503, "bad_key", "Anthropic rejected the server's request.");
+    return new Fail(503, "bad_key", "The AI provider rejected the server's request.");
   }
   if (e instanceof Anthropic.APIError) {
     console.error(JSON.stringify({ fn: "cal-ai", anthropic: e.status ?? null, message: e.message }));
-    return new Fail(503, "busy", "Claude is busy. Try again in a moment.");
+    return aiBusy();
   }
   return e instanceof Error ? e : new Error(String(e));
 }
@@ -659,7 +741,7 @@ async function askClaude(
   apiKey: string,
   task: Exclude<Task, "status">,
   input: Input,
-  log: { usage: unknown },
+  log: Log,
   deadline: number, // the request's whole budget, shared with the database calls
 ): Promise<Json> {
   const client = new Anthropic({
@@ -668,11 +750,12 @@ async function askClaude(
     maxRetries: 0, // retried once below, inside the same deadline
     timeout: Math.max(1000, deadline - Date.now()),
   });
+  log.model = CLAUDE_MODEL;
   const params: Anthropic.MessageCreateParamsNonStreaming = {
-    model: MODEL,
+    model: CLAUDE_MODEL,
     max_tokens: MAX_TOKENS,
     system: SYSTEM[task],
-    messages: [{ role: "user", content: userContent(task, input) }],
+    messages: [{ role: "user", content: claudeContent(task, input) }],
     output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMAS[task] } },
   };
   const send = () => client.messages.create(params, { timeout: Math.max(1000, deadline - Date.now()) });
@@ -681,7 +764,7 @@ async function askClaude(
   try {
     msg = await send();
   } catch (e) {
-    if (!transient(e) || deadline - Date.now() < 12_000) throw claudeError(e, task);
+    if (!transient(e) || deadline - Date.now() < MIN_RETRY_MS) throw claudeError(e, task);
     await sleep(800);
     try {
       msg = await send();
@@ -693,22 +776,224 @@ async function askClaude(
   // Logged even when the answer is then rejected: it was still billed.
   log.usage = { input_tokens: msg.usage?.input_tokens ?? 0, output_tokens: msg.usage?.output_tokens ?? 0 };
   // stop_reason before content: a refusal or a cut-off answer may not match the schema.
-  if (msg.stop_reason === "refusal") throw new Fail(422, "refused", "Claude declined this request.");
-  if (msg.stop_reason === "max_tokens") throw new Fail(422, "unreadable", "The answer was cut off.");
-  if (msg.stop_reason !== "end_turn" && msg.stop_reason !== "stop_sequence") {
-    throw new Fail(422, "unreadable", "Claude didn't finish the answer.");
-  }
+  if (msg.stop_reason === "refusal") throw refused();
+  if (msg.stop_reason === "max_tokens") throw cutOff();
+  if (msg.stop_reason !== "end_turn" && msg.stop_reason !== "stop_sequence") throw unfinished();
   // Haiku 5.5 thinks first, so the answer is the first text block, not content[0].
   const block = msg.content.find((b) => b.type === "text");
-  if (!block || block.type !== "text") throw new Fail(422, "unreadable", "Claude's answer was empty.");
-  let data: unknown;
+  return parseAnswer(block && block.type === "text" ? block.text : undefined);
+}
+
+// ---------------------------------------------------------------------------
+// Gemini
+// ---------------------------------------------------------------------------
+// Google's error body. The SDK's ApiError has a numeric `status` and puts the
+// body, JSON-serialised, in `message`: {"error": {"code", "message",
+// "status": "INVALID_ARGUMENT", "details": [{"@type": "…ErrorInfo",
+// "reason": "API_KEY_INVALID"}]}}. A 429 carries a QuotaFailure detail whose
+// violations name the quota: {"quotaId":
+// "GenerateRequestsPerDayPerProjectPerModel-FreeTier", …}. Read as data, never
+// string-matched.
+interface GoogleError {
+  status: string;
+  reasons: string[];
+  quotaIds: string[];
+  message: string;
+}
+function googleError(e: ApiError): GoogleError {
+  let o: unknown = null;
   try {
-    data = JSON.parse(block.text);
-  } catch {
-    throw new Fail(422, "unreadable", "Claude's answer wasn't valid JSON.");
+    o = JSON.parse(e.message);
+  } catch { /* not JSON: nothing more to read */ }
+  const err = isObj(o) && isObj(o.error) ? o.error : {};
+  const details = Array.isArray(err.details) ? err.details : [];
+  return {
+    status: typeof err.status === "string" ? err.status : "",
+    reasons: details.flatMap((d) => (isObj(d) && typeof d.reason === "string" ? [d.reason] : [])),
+    quotaIds: details.flatMap((d) =>
+      isObj(d) && Array.isArray(d.violations)
+        ? d.violations.flatMap((v) => (isObj(v) && typeof v.quotaId === "string" ? [v.quotaId] : []))
+        : []
+    ),
+    message: typeof err.message === "string" ? err.message.slice(0, 300) : "",
+  };
+}
+
+/** Our own deadline ran out: the SDK only sees an aborted fetch. */
+class TimedOut extends Error {}
+
+/** Out of quota: the fallback model has a free allowance of its own. */
+const exhausted = (e: unknown) => e instanceof ApiError && e.status === 429;
+/** A 429 for a per-day quota, which comes back only at midnight Pacific, not in a minute. */
+const dailyQuota = (e: unknown) =>
+  e instanceof ApiError && e.status === 429 && googleError(e).quotaIds.some((q) => /PerDay/i.test(q));
+/** Overloaded or a dropped connection: worth one quick retry. A timeout or a 429 is not. */
+const geminiTransient = (e: unknown) => (e instanceof ApiError && e.status >= 500) || e instanceof TypeError;
+/** The key or the Google project itself was refused: a wrong or expired key comes
+ *  back as 400 INVALID_ARGUMENT with reason API_KEY_INVALID; a region the free
+ *  tier doesn't serve, or billing that is needed, as 400 FAILED_PRECONDITION. */
+const accountFault = (e: unknown) => {
+  if (!(e instanceof ApiError)) return false;
+  const g = googleError(e);
+  return e.status === 401 || e.status === 403 || g.status === "FAILED_PRECONDITION" ||
+    g.reasons.some((r) => r.startsWith("API_KEY_"));
+};
+
+/** daily: whether the allowance is gone until midnight Pacific. Decided by the
+ *  caller when two models answered 429; otherwise from this error alone. */
+function geminiError(e: unknown, task: Exclude<Task, "status">, model: string, daily = dailyQuota(e)): Error {
+  if (e instanceof TimedOut) return tooSlow();
+  if (e instanceof ApiError) {
+    const g = googleError(e);
+    console.error(JSON.stringify({ fn: "cal-ai", gemini: e.status, model, task, ...g }));
+    if (e.status === 429) {
+      // reason "quota" lets the app say when it comes back, rather than "in a moment".
+      return daily
+        ? new Fail(503, "busy", "The free AI allowance is used up for today. It comes back at midnight Pacific time.", {
+          reason: "quota",
+        })
+        : new Fail(503, "busy", "The free AI allowance is used up for now. Try again later.");
+    }
+    // Both are the owner's to fix.
+    if (accountFault(e)) {
+      return new Fail(503, "bad_key", "The AI provider rejected the server's key or account.");
+    }
+    if (e.status === 404) return new Fail(503, "bad_key", "The AI model isn't available to this account.");
+    if (e.status === 413) return new Fail(400, "bad_request", "The request is too large for the AI.");
+    if (e.status === 400) {
+      // As with Claude: with a photo it is usually the image; with text, the
+      // request is the server's own, so AI reads as off until it is fixed.
+      if (task === "photo" || task === "label") {
+        return new Fail(422, "unreadable", "The AI couldn't process this photo.");
+      }
+      return new Fail(503, "bad_key", "The AI provider rejected the server's request.");
+    }
+    return aiBusy();
   }
-  if (!isObj(data)) throw new Fail(422, "unreadable", "Claude's answer had the wrong shape.");
-  return data;
+  if (e instanceof TypeError) {
+    console.error(JSON.stringify({ fn: "cal-ai", gemini: "network", model, message: e.message }));
+    return new Fail(503, "busy", "Couldn't reach the AI. Try again in a moment.");
+  }
+  return e instanceof Error ? e : new Error(String(e));
+}
+
+// Stopped for what it would have said, or for what was sent.
+const GEMINI_REFUSED = new Set<string>([
+  FinishReason.SAFETY,
+  FinishReason.RECITATION,
+  FinishReason.BLOCKLIST,
+  FinishReason.PROHIBITED_CONTENT,
+  FinishReason.SPII,
+  FinishReason.IMAGE_SAFETY,
+  FinishReason.IMAGE_PROHIBITED_CONTENT,
+  FinishReason.IMAGE_RECITATION,
+]);
+
+/** Gemini 3 takes a thinking level: Flash's lowest is LOW, Flash-Lite has MINIMAL. */
+const thinkingFor = (model: string) => (/flash-lite/i.test(model) ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW);
+
+async function askGemini(
+  apiKey: string,
+  task: Exclude<Task, "status">,
+  input: Input,
+  log: Log,
+  deadline: number, // the request's whole budget, shared with the database calls
+): Promise<Json> {
+  const ai = new GoogleGenAI({
+    apiKey,
+    // Both said outright: left unset, the SDK reads GOOGLE_GENAI_USE_VERTEXAI /
+    // GOOGLE_GENAI_USE_ENTERPRISE and GOOGLE_GEMINI_BASE_URL from the
+    // environment, and a stray secret could send this AI Studio key elsewhere.
+    vertexai: false,
+    httpOptions: {
+      baseUrl: Deno.env.get("GEMINI_BASE_URL") || "https://generativelanguage.googleapis.com/",
+      retryOptions: { attempts: 1 }, // no retries by the SDK: retried below, inside the same deadline
+    },
+  });
+  const primary = (Deno.env.get("GEMINI_MODEL") || "").trim() || GEMINI_MODEL;
+  const fallback = (Deno.env.get("GEMINI_FALLBACK_MODEL") || "").trim() || GEMINI_FALLBACK_MODEL;
+
+  const send = async (model: string): Promise<GenerateContentResponse> => {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), Math.max(1000, deadline - Date.now()));
+    try {
+      return await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: geminiParts(task, input) }],
+        config: {
+          systemInstruction: SYSTEM[task],
+          responseMimeType: "application/json",
+          responseJsonSchema: GEMINI_SCHEMAS[task],
+          thinkingConfig: { thinkingLevel: thinkingFor(model) },
+          maxOutputTokens: MAX_TOKENS,
+          abortSignal: ctl.signal,
+        },
+      });
+    } catch (e) {
+      throw ctl.signal.aborted ? new TimedOut() : e;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  let model = primary;
+  let first429: unknown = null; // the primary's 429, once it has sent us to the fallback
+  let retried = false;
+  let res: GenerateContentResponse | null = null;
+  while (!res) {
+    log.model = model;
+    try {
+      res = await send(model);
+    } catch (e) {
+      const left = deadline - Date.now();
+      if (exhausted(e) && !first429 && fallback !== model && left >= MIN_FALLBACK_MS) {
+        console.error(JSON.stringify({ fn: "cal-ai", gemini: 429, model, next: fallback, daily: dailyQuota(e) }));
+        first429 = e;
+        model = fallback;
+        continue;
+      }
+      if (geminiTransient(e) && !retried && left >= MIN_RETRY_MS) {
+        retried = true;
+        await sleep(800);
+        continue;
+      }
+      if (first429) {
+        // Out of allowance on both: gone till midnight only if both are per-day quotas.
+        if (exhausted(e)) throw geminiError(e, task, model, dailyQuota(first429) && dailyQuota(e));
+        // The fallback refused the key or the project, which the primary shares,
+        // or it is overloaded or slow, which passes: what it says stands.
+        // Anything else (a fallback model renamed or retired, a setting it
+        // rejects) is the fallback's own trouble, and must not turn AI off
+        // while the primary only waits for its allowance: the primary's 429 stands.
+        if (!accountFault(e) && !geminiTransient(e) && !(e instanceof TimedOut)) {
+          geminiError(e, task, model); // logged with its model; the reply is the primary's
+          throw geminiError(first429, task, primary);
+        }
+      }
+      throw geminiError(e, task, model);
+    }
+  }
+
+  // Logged even when the answer is then rejected: it was still counted.
+  const u = res.usageMetadata;
+  log.usage = {
+    input_tokens: u?.promptTokenCount ?? 0,
+    output_tokens: (u?.candidatesTokenCount ?? 0) + (u?.thoughtsTokenCount ?? 0),
+  };
+  // Why it stopped, before the text: a blocked or cut-off answer may not match the schema.
+  const blocked = res.promptFeedback?.blockReason;
+  const cand = res.candidates?.[0];
+  const why = cand?.finishReason;
+  if (blocked || why !== FinishReason.STOP) {
+    console.error(JSON.stringify({ fn: "cal-ai", gemini: "finish", model, blocked: blocked ?? null, finish: why ?? null }));
+  }
+  if (blocked && blocked !== BlockedReason.BLOCKED_REASON_UNSPECIFIED) throw refused();
+  if (!cand) throw new Fail(422, "unreadable", "The AI's answer was empty.");
+  if (why === FinishReason.MAX_TOKENS) throw cutOff();
+  if (why && GEMINI_REFUSED.has(why)) throw refused();
+  if (why !== FinishReason.STOP) throw unfinished();
+  // `text` joins the answer's text parts and leaves out any thoughts.
+  return parseAnswer(res.text);
 }
 
 // ---------------------------------------------------------------------------
@@ -878,7 +1163,9 @@ function shape(task: Exclude<Task, "status">, d: Json, input: Input): Json {
 // ---------------------------------------------------------------------------
 interface Log {
   task: string;
-  usage: unknown; // Claude's token counts
+  provider: Provider | null;
+  model: string | null; // the last model asked
+  usage: unknown; // the model's token counts
   counted: { used: number; limit: number } | null; // set once cal_ai_begin has counted this request
 }
 
@@ -893,31 +1180,34 @@ async function handle(req: Request, log: Log, deadline: number): Promise<Json> {
   if (!task) throw new Fail(400, "bad_request", "Unknown task.");
   log.task = task;
 
-  const apiKey = (Deno.env.get("ANTHROPIC_API_KEY") || "").trim();
+  const ai = pickAi();
   if (task === "status") {
     const u = await usage("cal_ai_status", key, req, deadline);
-    return { configured: apiKey !== "", used: u.used, limit: u.limit };
+    return { configured: ai !== null, provider: ai ? ai.provider : "", used: u.used, limit: u.limit };
   }
 
   const input = readInput(task, body);
   // Before counting: a server with no key must not use up anyone's allowance.
-  if (!apiKey) {
+  if (!ai) {
     throw new Fail(503, "not_configured", "This server doesn't have an AI key yet, so AI is off.");
   }
+  log.provider = ai.provider;
   // A slow upload can eat the budget. Better to say so now, uncounted, than
-  // to count it and call Claude with no time left to answer.
-  if (deadline - Date.now() < MIN_CLAUDE_MS) {
+  // to count it and call the model with no time left to answer.
+  if (deadline - Date.now() < MIN_AI_MS) {
     throw new Fail(503, "busy", "That took too long to arrive. Try again in a moment.");
   }
   log.counted = await usage("cal_ai_begin", key, req, deadline);
-  const data = await askClaude(apiKey, task, input, log, deadline);
+  const data = ai.provider === "gemini"
+    ? await askGemini(ai.key, task, input, log, deadline)
+    : await askClaude(ai.key, task, input, log, deadline);
   return shape(task, data, input);
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return reply(204, null);
   const started = Date.now();
-  const log: Log = { task: "", usage: null, counted: null };
+  const log: Log = { task: "", provider: null, model: null, usage: null, counted: null };
   let status: number;
   let body: unknown;
   try {
@@ -933,12 +1223,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
       body = { error: "server_error", message: "Something went wrong on the server." };
     }
   }
+  // Once the AI is chosen, every reply names it, so the app can say when what
+  // is sent goes to Google even if its status check never got an answer.
+  if (log.provider && isObj(body)) body = { ...body, provider: log.provider };
   // Once counted, every reply says so, success or not (busy, refused,
   // unreadable…), so the app's "N of 60 today" matches the server's count.
   if (log.counted && isObj(body)) body = { ...body, used: log.counted.used, limit: log.counted.limit };
   // One line per request for the function logs. Never the key or what was said.
   console.log(
-    JSON.stringify({ fn: "cal-ai", task: log.task || null, status, ms: Date.now() - started, usage: log.usage }),
+    JSON.stringify({
+      fn: "cal-ai",
+      task: log.task || null,
+      status,
+      ms: Date.now() - started,
+      provider: log.provider,
+      model: log.model,
+      usage: log.usage,
+    }),
   );
   return reply(status, body);
 });
